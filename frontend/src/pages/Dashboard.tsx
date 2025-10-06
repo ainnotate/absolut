@@ -17,6 +17,13 @@ import { User } from '../types';
 const Dashboard: React.FC = () => {
   const user: User | null = authService.getUser();
 
+  // Redirect admin users to admin panel
+  React.useEffect(() => {
+    if (user && user.role === 'admin') {
+      window.location.href = '/admin';
+    }
+  }, [user]);
+
   if (!user) {
     return (
       <Box sx={{ p: 3 }}>
