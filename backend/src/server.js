@@ -1,0 +1,49 @@
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const { initializeDatabase } = require('./models/database');
+
+const authRoutes = require('./routes/authRoutes');
+
+const app = express();
+const PORT = process.env.PORT || 5003;
+
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.use('/api/auth', authRoutes);
+
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    message: 'Absolute Platform API is running',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
+});
+
+const startServer = async () => {
+  try {
+    await initializeDatabase();
+    console.log('✅ Database initialized successfully');
+    
+    app.listen(PORT, () => {
+      console.log(`🚀 Absolute Platform Server running on http://localhost:${PORT}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
