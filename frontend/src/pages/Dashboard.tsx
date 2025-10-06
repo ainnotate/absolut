@@ -27,7 +27,23 @@ const Dashboard: React.FC = () => {
   }
 
   const handleLogout = () => {
+    // Sign out from Google if available
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      window.google.accounts.id.disableAutoSelect();
+      // Cancel any ongoing flows
+      try {
+        window.google.accounts.id.cancel();
+      } catch (e) {
+        // Ignore if no active flow
+      }
+    }
+    
     authService.logout();
+    
+    // Clear any Google-related cookies/storage
+    localStorage.removeItem('g_state');
+    sessionStorage.clear();
+    
     window.location.href = '/';
   };
 

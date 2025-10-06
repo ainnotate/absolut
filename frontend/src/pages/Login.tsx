@@ -110,7 +110,9 @@ const Login: React.FC = () => {
         window.google.accounts.id.renderButton(loginButton, { 
           theme: 'outline', 
           size: 'large',
-          width: '100%'
+          width: 360,
+          text: 'signin_with',
+          locale: 'en'
         });
       }
       
@@ -119,13 +121,41 @@ const Login: React.FC = () => {
         window.google.accounts.id.renderButton(registerButton, { 
           theme: 'outline', 
           size: 'large',
-          width: '100%'
+          width: 360,
+          text: 'signup_with',
+          locale: 'en'
         });
       }
     }
   }, [tabValue]);
 
   React.useEffect(() => {
+    // Aggressively clear Google-related storage and cookies
+    try {
+      // Clear localStorage
+      localStorage.removeItem('g_state');
+      sessionStorage.removeItem('g_state');
+      const googleKeys = Object.keys(localStorage).filter(key => key.startsWith('g_'));
+      googleKeys.forEach(key => localStorage.removeItem(key));
+      
+      // Clear any Google-related cookies by setting them to expire
+      document.cookie.split(";").forEach(function(c) { 
+        document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+      });
+      
+      // Force clear session
+      if (window.google && window.google.accounts && window.google.accounts.id) {
+        try {
+          window.google.accounts.id.disableAutoSelect();
+          window.google.accounts.id.cancel();
+        } catch (e) {
+          // Ignore
+        }
+      }
+    } catch (e) {
+      // Ignore storage errors
+    }
+
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
@@ -146,8 +176,23 @@ const Login: React.FC = () => {
             } finally {
               setLoading(false);
             }
-          }
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          use_fedcm_for_prompt: false,
+          state_cookie_domain: 'localhost'
         });
+        
+        // Aggressively disable automatic sign-in
+        window.google.accounts.id.disableAutoSelect();
+        
+        // Clear any existing Google state
+        try {
+          window.google.accounts.id.cancel();
+        } catch (e) {
+          // Ignore if no active flow
+        }
+        
         renderGoogleButtons();
       }
     };
@@ -234,7 +279,7 @@ const Login: React.FC = () => {
               
               <Divider sx={{ my: 2 }}>OR</Divider>
               
-              <div id="google-signin-button" style={{ marginTop: '8px' }}></div>
+              <Box id="google-signin-button" sx={{ mt: 1, display: 'flex', justifyContent: 'center', minHeight: '44px' }}></Box>
             </form>
           </TabPanel>
 
@@ -307,7 +352,7 @@ const Login: React.FC = () => {
               
               <Divider sx={{ my: 2 }}>OR</Divider>
               
-              <div id="google-signin-button-register" style={{ marginTop: '8px' }}></div>
+              <Box id="google-signin-button-register" sx={{ mt: 1, display: 'flex', justifyContent: 'center', minHeight: '44px' }}></Box>
             </form>
           </TabPanel>
         </Card>
