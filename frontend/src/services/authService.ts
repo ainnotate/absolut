@@ -1,6 +1,6 @@
 import { AuthResponse, LoginCredentials, RegisterData, GoogleCredential, User } from '../types';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5003/api';
 
 class AuthService {
   private token: string | null = null;
@@ -20,22 +20,35 @@ class AuthService {
   }
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(credentials),
-    });
+    console.log('Attempting login to:', `${API_URL}/auth/login`);
+    console.log('Credentials:', { username: credentials.username, password: '***' });
+    
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Login failed');
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Login error response:', error);
+        throw new Error(error.error || 'Login failed');
+      }
+
+      const data: AuthResponse = await response.json();
+      console.log('Login successful, user role:', data.user.role);
+      this.setAuthData(data.token, data.user);
+      return data;
+    } catch (error) {
+      console.error('Login fetch error:', error);
+      throw error;
     }
-
-    const data: AuthResponse = await response.json();
-    this.setAuthData(data.token, data.user);
-    return data;
   }
 
   async googleLogin(googleCredential: GoogleCredential): Promise<AuthResponse> {

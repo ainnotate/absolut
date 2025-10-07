@@ -11,7 +11,12 @@ const app = express();
 const PORT = process.env.PORT || 5003;
 
 app.use(cors({
-  origin: ['http://localhost:3002', 'http://localhost:3000'],
+  origin: [
+    'http://localhost:3002', 
+    'http://localhost:3000',
+    'http://192.168.29.158:3002',
+    'http://192.168.29.158:3000'
+  ],
   credentials: true
 }));
 
@@ -51,8 +56,9 @@ const startServer = async () => {
     await initializeDatabase();
     console.log('✅ Database initialized successfully');
     
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Absolute Platform Server running on http://localhost:${PORT}`);
+      console.log(`🌐 Mobile access: http://192.168.29.158:${PORT}`);
       console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
     });
   } catch (error) {
