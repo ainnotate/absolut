@@ -95,18 +95,38 @@ const initializeDatabase = () => {
         }
       });
 
+      // Create assets table first
+      db.run(`
+        CREATE TABLE IF NOT EXISTS assets (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          asset_id TEXT UNIQUE NOT NULL,
+          user_id INTEGER NOT NULL,
+          deliverable_type TEXT NOT NULL,
+          metadata TEXT,
+          created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Error creating assets table:', err);
+          reject(err);
+        } else {
+          console.log('Assets table created/verified');
+        }
+      });
+
       db.run(`
         CREATE TABLE IF NOT EXISTS uploads (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
+          asset_id TEXT NOT NULL,
           user_id INTEGER NOT NULL,
           filename TEXT NOT NULL,
           file_type TEXT NOT NULL,
-          deliverable_type TEXT NOT NULL,
           s3_key TEXT NOT NULL,
           md5_hash TEXT NOT NULL,
-          metadata TEXT,
           upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (user_id) REFERENCES users(id),
+          FOREIGN KEY (asset_id) REFERENCES assets(asset_id),
           UNIQUE(user_id, md5_hash)
         )
       `, (err) => {

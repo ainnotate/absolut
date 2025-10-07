@@ -157,6 +157,27 @@ const uploadFiles = async (req, res) => {
     const fileHashes = {};
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
+    // Generate unique Asset ID
+    const assetId = `AST_${req.user.id}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
+    // Create asset record first
+    await new Promise((resolve, reject) => {
+      db.run(
+        `INSERT INTO assets (asset_id, user_id, deliverable_type, metadata) 
+         VALUES (?, ?, ?, ?)`,
+        [
+          assetId,
+          req.user.id,
+          deliverableType,
+          JSON.stringify(metadataObj)
+        ],
+        (err) => {
+          if (err) reject(err);
+          else resolve();
+        }
+      );
+    });
+
     // Process files based on category
     if (category === '.eml') {
       const emlFile = files.emlFile?.[0];
@@ -187,7 +208,8 @@ const uploadFiles = async (req, res) => {
         filename: customFilename,
         type: 'eml',
         s3Key: s3Key,
-        md5Hash: emlHash
+        md5Hash: emlHash,
+        assetId: assetId
       });
 
     } else if (category === '.eml + pdf') {
@@ -244,13 +266,15 @@ const uploadFiles = async (req, res) => {
           filename: emlCustomFilename,
           type: 'eml',
           s3Key: emlS3Key,
-          md5Hash: emlHash
+          md5Hash: emlHash,
+          assetId: assetId
         },
         {
           filename: pdfCustomFilename,
           type: 'pdf',
           s3Key: pdfS3Key,
-          md5Hash: pdfHash
+          md5Hash: pdfHash,
+          assetId: assetId
         }
       );
 
@@ -293,7 +317,8 @@ const uploadFiles = async (req, res) => {
         filename: customFilename,
         type: 'txt',
         s3Key: s3Key,
-        md5Hash: txtHash
+        md5Hash: txtHash,
+        assetId: assetId
       });
     }
 
@@ -301,16 +326,15 @@ const uploadFiles = async (req, res) => {
     for (const fileInfo of uploadedFiles) {
       await new Promise((resolve, reject) => {
         db.run(
-          `INSERT INTO uploads (user_id, filename, file_type, deliverable_type, s3_key, md5_hash, metadata) 
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO uploads (asset_id, user_id, filename, file_type, s3_key, md5_hash) 
+           VALUES (?, ?, ?, ?, ?, ?)`,
           [
+            fileInfo.assetId,
             req.user.id,
             fileInfo.filename,
             fileInfo.type,
-            deliverableType,
             fileInfo.s3Key,
-            fileInfo.md5Hash,
-            JSON.stringify(metadataObj)
+            fileInfo.md5Hash
           ],
           (err) => {
             if (err) reject(err);
@@ -322,8 +346,9 @@ const uploadFiles = async (req, res) => {
 
     res.status(201).json({
       message: 'Files uploaded successfully',
-      uploadedFiles: uploadedFiles,
+      assetId: assetId,
       deliverableType: deliverableType,
+      uploadedFiles: uploadedFiles,
       metadata: metadataObj
     });
 
@@ -340,7 +365,13 @@ const uploadFiles = async (req, res) => {
 const getUserUploads = async (req, res) => {
   try {
     db.all(
-      `SELECT * FROM uploads WHERE user_id = ? ORDER BY upload_date DESC`,
+      `SELECT 
+        u.id, u.filename, u.file_type, u.s3_key, u.md5_hash, u.upload_date,
+        a.asset_id, a.deliverable_type, a.metadata, a.created_date
+       FROM uploads u 
+       JOIN assets a ON u.asset_id = a.asset_id 
+       WHERE u.user_id = ? 
+       ORDER BY a.created_date DESC, u.upload_date ASC`,
       [req.user.id],
       (err, uploads) => {
         if (err) {
@@ -352,12 +383,15 @@ const getUserUploads = async (req, res) => {
 
         const formattedUploads = uploads.map(upload => ({
           id: upload.id,
+          assetId: upload.asset_id,
           filename: upload.filename,
           fileType: upload.file_type,
           deliverableType: upload.deliverable_type,
+          s3Key: upload.s3_key,
           md5Hash: upload.md5_hash,
           metadata: upload.metadata ? JSON.parse(upload.metadata) : {},
-          uploadDate: upload.upload_date
+          uploadDate: upload.upload_date,
+          assetCreatedDate: upload.created_date
         }));
 
         res.json({ uploads: formattedUploads });
