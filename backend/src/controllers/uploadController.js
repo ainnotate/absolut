@@ -18,6 +18,57 @@ function calculateMD5(buffer) {
   return crypto.createHash('md5').update(buffer).digest('hex');
 }
 
+// Generate filename based on metadata format
+function generateFilename(userId, metadata, fileType, timestamp) {
+  // Clean metadata values to be filesystem-safe
+  const cleanValue = (value) => {
+    if (!value) return 'unknown';
+    return value.toString()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '');
+  };
+
+  const locale = cleanValue(metadata.locale);
+  const sourceName = cleanValue(metadata.sourceName);
+  const bookingType = cleanValue(metadata.bookingType);
+  
+  // Map category to deliverable type
+  let deliverableType;
+  switch (fileType) {
+    case 'eml':
+      deliverableType = 'email';
+      break;
+    case 'pdf':
+      deliverableType = 'pdf';
+      break;
+    case 'txt':
+      deliverableType = 'text';
+      break;
+    default:
+      deliverableType = fileType;
+  }
+
+  // Get file extension
+  let extension;
+  switch (fileType) {
+    case 'eml':
+      extension = '.eml';
+      break;
+    case 'pdf':
+      extension = '.pdf';
+      break;
+    case 'txt':
+      extension = '.txt';
+      break;
+    default:
+      extension = '.bin';
+  }
+
+  return `${userId}_${locale}_${sourceName}_${bookingType}_${deliverableType}_${timestamp}${extension}`;
+}
+
 // Check if file with same MD5 exists for user
 function checkDuplicate(md5Hash, userId) {
   return new Promise((resolve, reject) => {
@@ -107,15 +158,16 @@ const uploadFiles = async (req, res) => {
 
       fileHashes.eml = emlHash;
 
-      // Upload to S3
-      const s3Key = `uploads/${req.user.id}/${timestamp}_${emlHash.substring(0, 8)}/${emlFile.originalname}`;
+      // Generate custom filename and upload to S3
+      const customFilename = generateFilename(req.user.id, metadataObj, 'eml', timestamp);
+      const s3Key = `${req.user.id}/${metadataObj.locale}/${customFilename}`;
       
       if (!await uploadToS3(emlFile.buffer, s3Key, 'message/rfc822')) {
         return res.status(500).json({ error: 'Failed to upload EML file to storage' });
       }
 
       uploadedFiles.push({
-        filename: emlFile.originalname,
+        filename: customFilename,
         type: 'eml',
         s3Key: s3Key,
         md5Hash: emlHash
@@ -150,10 +202,11 @@ const uploadFiles = async (req, res) => {
       fileHashes.eml = emlHash;
       fileHashes.pdf = pdfHash;
 
-      // Upload to S3
-      const basePath = `uploads/${req.user.id}/${timestamp}_${emlHash.substring(0, 8)}`;
-      const emlS3Key = `${basePath}/${emlFile.originalname}`;
-      const pdfS3Key = `${basePath}/${pdfFile.originalname}`;
+      // Generate custom filenames and upload to S3
+      const emlCustomFilename = generateFilename(req.user.id, metadataObj, 'eml', timestamp);
+      const pdfCustomFilename = generateFilename(req.user.id, metadataObj, 'pdf', timestamp);
+      const emlS3Key = `${req.user.id}/${metadataObj.locale}/${emlCustomFilename}`;
+      const pdfS3Key = `${req.user.id}/${metadataObj.locale}/${pdfCustomFilename}`;
 
       if (!await uploadToS3(emlFile.buffer, emlS3Key, 'message/rfc822')) {
         return res.status(500).json({ error: 'Failed to upload EML file to storage' });
@@ -171,13 +224,13 @@ const uploadFiles = async (req, res) => {
 
       uploadedFiles.push(
         {
-          filename: emlFile.originalname,
+          filename: emlCustomFilename,
           type: 'eml',
           s3Key: emlS3Key,
           md5Hash: emlHash
         },
         {
-          filename: pdfFile.originalname,
+          filename: pdfCustomFilename,
           type: 'pdf',
           s3Key: pdfS3Key,
           md5Hash: pdfHash
@@ -189,14 +242,11 @@ const uploadFiles = async (req, res) => {
       const { textContent } = req.body;
 
       let txtBuffer;
-      let txtFilename;
 
       if (txtFile) {
         txtBuffer = txtFile.buffer;
-        txtFilename = txtFile.originalname;
       } else if (textContent) {
         txtBuffer = Buffer.from(textContent, 'utf-8');
-        txtFilename = `text_${timestamp}.txt`;
       } else {
         return res.status(400).json({ 
           error: 'Either TXT file or text content is required' 
@@ -214,15 +264,16 @@ const uploadFiles = async (req, res) => {
 
       fileHashes.txt = txtHash;
 
-      // Upload to S3
-      const s3Key = `uploads/${req.user.id}/${timestamp}_${txtHash.substring(0, 8)}/${txtFilename}`;
+      // Generate custom filename and upload to S3
+      const customFilename = generateFilename(req.user.id, metadataObj, 'txt', timestamp);
+      const s3Key = `${req.user.id}/${metadataObj.locale}/${customFilename}`;
 
       if (!await uploadToS3(txtBuffer, s3Key, 'text/plain')) {
         return res.status(500).json({ error: 'Failed to upload text file to storage' });
       }
 
       uploadedFiles.push({
-        filename: txtFilename,
+        filename: customFilename,
         type: 'txt',
         s3Key: s3Key,
         md5Hash: txtHash
