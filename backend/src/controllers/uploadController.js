@@ -138,11 +138,7 @@ const uploadFiles = async (req, res) => {
 
     const uploadedFiles = [];
     const fileHashes = {};
-    
-    // Generate Indian Standard Time (IST) timestamp
-    const now = new Date();
-    const istTime = new Date(now.getTime() + (5.5 * 60 * 60 * 1000)); // Add 5.5 hours for IST
-    const timestamp = istTime.toISOString().replace(/[:.]/g, '-').replace('Z', 'IST');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 
     // Process files based on category
     if (category === '.eml') {
