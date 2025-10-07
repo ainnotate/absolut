@@ -79,18 +79,7 @@ Absolute/
 
 4. **Access the Application**
    - Frontend: http://localhost:3000
-   - Backend API: http://localhost:5000
-
-## Default Users
-
-After running the seed script, you can login with these default accounts:
-
-| Role | Username | Email | Password |
-|------|----------|--------|----------|
-| Admin | admin | admin@absolute.com | admin123 |
-| Supervisor | supervisor1 | supervisor@absolute.com | supervisor123 |
-| QC User | qc_user1 | qc@absolute.com | qc123 |
-| Upload User | uploader1 | uploader@absolute.com | upload123 |
+   - Backend API: http://localhost:5003
 
 ## User Roles & Permissions
 
