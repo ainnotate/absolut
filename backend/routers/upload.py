@@ -69,8 +69,8 @@ async def upload_files(
 ):
     """Handle file uploads with MD5 duplicate detection and S3 storage"""
     
-    # Check if user has uploader role
-    if current_user.role not in ['uploader', 'admin']:
+    # Check if user has upload_user role
+    if current_user.role not in ['upload_user', 'admin']:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have permission to upload files"
