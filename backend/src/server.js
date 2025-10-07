@@ -5,6 +5,7 @@ const { initializeDatabase } = require('./models/database');
 
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5003;
@@ -26,6 +27,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api', uploadRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ 

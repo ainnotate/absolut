@@ -96,6 +96,29 @@ const initializeDatabase = () => {
       });
 
       db.run(`
+        CREATE TABLE IF NOT EXISTS uploads (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          filename TEXT NOT NULL,
+          file_type TEXT NOT NULL,
+          category TEXT NOT NULL,
+          s3_key TEXT NOT NULL,
+          md5_hash TEXT NOT NULL,
+          metadata TEXT,
+          upload_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id),
+          UNIQUE(user_id, md5_hash)
+        )
+      `, (err) => {
+        if (err) {
+          console.error('Error creating uploads table:', err);
+          reject(err);
+        } else {
+          console.log('Uploads table created/verified');
+        }
+      });
+
+      db.run(`
         CREATE TABLE IF NOT EXISTS qc_reviews (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           upload_id INTEGER NOT NULL,

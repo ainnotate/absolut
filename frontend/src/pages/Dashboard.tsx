@@ -17,10 +17,14 @@ import { User } from '../types';
 const Dashboard: React.FC = () => {
   const user: User | null = authService.getUser();
 
-  // Redirect admin users to admin panel
+  // Redirect users based on their roles
   React.useEffect(() => {
-    if (user && user.role === 'admin') {
-      window.location.href = '/admin';
+    if (user) {
+      if (user.role === 'admin') {
+        window.location.href = '/admin';
+      } else if (user.role === 'upload_user') {
+        window.location.href = '/upload';
+      }
     }
   }, [user]);
 
@@ -286,7 +290,7 @@ const Dashboard: React.FC = () => {
                   <Typography variant="body2" color="text.secondary">
                     Upload new files for quality control review.
                   </Typography>
-                  <Button variant="contained" sx={{ mt: 2 }}>
+                  <Button variant="contained" sx={{ mt: 2 }} onClick={() => window.location.href = '/upload'}>
                     Start Upload
                   </Button>
                 </CardContent>
