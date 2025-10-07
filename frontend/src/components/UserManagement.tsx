@@ -293,6 +293,7 @@ const UserManagement: React.FC = () => {
           <Table>
             <TableHead>
               <TableRow>
+                <TableCell>User ID</TableCell>
                 <TableCell>User</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Role</TableCell>
@@ -305,19 +306,24 @@ const UserManagement: React.FC = () => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={8} align="center">
                     <CircularProgress />
                   </TableCell>
                 </TableRow>
               ) : users.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={8} align="center">
                     No users found
                   </TableCell>
                 </TableRow>
               ) : (
                 users.map((user) => (
                   <TableRow key={user.id}>
+                    <TableCell>
+                      <Typography variant="body2" fontFamily="monospace">
+                        {user.id}
+                      </Typography>
+                    </TableCell>
                     <TableCell>
                       <Box>
                         <Typography variant="body1">

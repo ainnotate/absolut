@@ -16,11 +16,11 @@ import {
   Logout,
   People,
   Dashboard as DashboardIcon,
-  Analytics,
-  Settings
+  TrackChanges
 } from '@mui/icons-material';
 import { authService } from '../services/authService';
 import UserManagement from '../components/UserManagement';
+import AssetTracking from '../components/AssetTracking';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -89,7 +89,7 @@ const AdminPanel: React.FC = () => {
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <People color="primary" sx={{ mr: 2 }} />
-              <Typography variant="h6">User Management</Typography>
+              <Typography variant="h6">Users</Typography>
             </Box>
             <Typography variant="body2" color="text.secondary" paragraph>
               Manage user accounts, roles, and permissions. Create new users, edit existing ones, and control access levels.
@@ -109,39 +109,18 @@ const AdminPanel: React.FC = () => {
         <Card>
           <CardContent>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <Analytics color="primary" sx={{ mr: 2 }} />
-              <Typography variant="h6">Analytics</Typography>
+              <TrackChanges color="primary" sx={{ mr: 2 }} />
+              <Typography variant="h6">Assets</Typography>
             </Box>
             <Typography variant="body2" color="text.secondary" paragraph>
-              View platform usage statistics, user activity reports, and system performance metrics.
+              Track and monitor uploaded assets across all users. View asset status, metadata, and file relationships.
             </Typography>
             <Button 
               variant="outlined" 
-              disabled
+              onClick={() => setTabValue(2)}
               fullWidth
             >
-              Coming Soon
-            </Button>
-          </CardContent>
-        </Card>
-      </Grid>
-
-      <Grid item xs={12} sm={6} md={4}>
-        <Card>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <Settings color="primary" sx={{ mr: 2 }} />
-              <Typography variant="h6">System Settings</Typography>
-            </Box>
-            <Typography variant="body2" color="text.secondary" paragraph>
-              Configure platform settings, security options, and system preferences.
-            </Typography>
-            <Button 
-              variant="outlined" 
-              disabled
-              fullWidth
-            >
-              Coming Soon
+              Track Assets
             </Button>
           </CardContent>
         </Card>
@@ -210,10 +189,17 @@ const AdminPanel: React.FC = () => {
             />
             <Tab 
               icon={<People />} 
-              label="User Management" 
+              label="Users" 
               iconPosition="start"
               id="admin-tab-1"
               aria-controls="admin-tabpanel-1"
+            />
+            <Tab 
+              icon={<TrackChanges />} 
+              label="Assets" 
+              iconPosition="start"
+              id="admin-tab-2"
+              aria-controls="admin-tabpanel-2"
             />
           </Tabs>
         </Box>
@@ -224,6 +210,10 @@ const AdminPanel: React.FC = () => {
 
         <TabPanel value={tabValue} index={1}>
           <UserManagement />
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={2}>
+          <AssetTracking />
         </TabPanel>
       </Container>
     </Box>
