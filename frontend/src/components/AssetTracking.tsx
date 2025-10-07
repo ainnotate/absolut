@@ -18,16 +18,13 @@ import {
   TextField,
   InputAdornment,
   Grid,
-  Avatar,
-  Tooltip
+  Avatar
 } from '@mui/material';
 import {
   KeyboardArrowDown,
   KeyboardArrowUp,
   Search,
   FilterList,
-  Download,
-  Visibility,
   Person
 } from '@mui/icons-material';
 
@@ -130,21 +127,9 @@ const AssetRow: React.FC<{ asset: Asset }> = ({ asset }) => {
             {formatDate(asset.createdDate)}
           </Typography>
         </TableCell>
-        <TableCell>
-          <Tooltip title="View Details">
-            <IconButton size="small">
-              <Visibility fontSize="small" />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Download">
-            <IconButton size="small">
-              <Download fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </TableCell>
       </TableRow>
       <TableRow>
-        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={7}>
+        <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
           <Collapse in={open} timeout="auto" unmountOnExit>
             <Box sx={{ margin: 1 }}>
               <Typography variant="h6" gutterBottom component="div">
@@ -212,84 +197,34 @@ const AssetTracking: React.FC = () => {
   const fetchAssets = async () => {
     try {
       setLoading(true);
-      // TODO: Implement API call to fetch assets
-      // For now, using mock data
-      const mockAssets: Asset[] = [
-        {
-          id: 1,
-          assetId: 'AST_4_1696780800000_a1b2c3',
-          userId: 4,
-          deliverableType: 'Email + Attachment',
-          metadata: {
-            assetOwnerGender: 'Male',
-            assetOwnerAge: '87',
-            locale: 'zh_TW',
-            sourceName: 'agoda.com',
-            bookingCategory: 'Flight - Airline',
-            bookingType: 'Confirmation'
-          },
-          createdDate: '2025-10-07T12:00:00Z',
-          user: {
-            username: 'uploader1',
-            email: 'uploader1@absolute.com',
-            first_name: 'uploader1',
-            last_name: ''
-          },
-          files: [
-            {
-              id: 1,
-              filename: '4_zh_tw_agoda_com_confirmation_email_2025-10-07T12-00-31-557Z.eml',
-              fileType: 'eml',
-              s3Key: '4/zh_TW/4_zh_tw_agoda_com_confirmation_email_2025-10-07T12-00-31-557Z.eml',
-              md5Hash: '5d14661793e32486aa973ae1ffe93477',
-              uploadDate: '2025-10-07T12:00:31Z'
-            },
-            {
-              id: 2,
-              filename: '4_zh_tw_agoda_com_confirmation_pdf_2025-10-07T12-00-31-557Z.pdf',
-              fileType: 'pdf',
-              s3Key: '4/zh_TW/4_zh_tw_agoda_com_confirmation_pdf_2025-10-07T12-00-31-557Z.pdf',
-              md5Hash: 'a1b2c3d4e5f6789012345678901234ab',
-              uploadDate: '2025-10-07T12:00:31Z'
-            }
-          ]
-        },
-        {
-          id: 2,
-          assetId: 'AST_4_1696780900000_x9y8z7',
-          userId: 4,
-          deliverableType: 'Raw Email',
-          metadata: {
-            assetOwnerGender: 'Female',
-            assetOwnerAge: '45',
-            locale: 'vi_VN',
-            sourceName: 'booking.com',
-            bookingCategory: 'Hotel - Resort',
-            bookingType: 'Invitation'
-          },
-          createdDate: '2025-10-07T13:15:00Z',
-          user: {
-            username: 'uploader1',
-            email: 'uploader1@absolute.com',
-            first_name: 'uploader1',
-            last_name: ''
-          },
-          files: [
-            {
-              id: 3,
-              filename: '5_vi_vn_booking_com_invitation_email_2025-10-07T13-15-22-123Z.eml',
-              fileType: 'eml',
-              s3Key: '5/vi_VN/5_vi_vn_booking_com_invitation_email_2025-10-07T13-15-22-123Z.eml',
-              md5Hash: 'b2c3d4e5f6789012345678901234abcd',
-              uploadDate: '2025-10-07T13:15:22Z'
-            }
-          ]
-        }
-      ];
       
-      setAssets(mockAssets);
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch('http://192.168.29.158:5003/api/assets', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch assets: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setAssets(data.assets);
+      } else {
+        throw new Error(data.message || 'Failed to fetch assets');
+      }
     } catch (error) {
       console.error('Error fetching assets:', error);
+      setAssets([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
@@ -420,7 +355,6 @@ const AssetTracking: React.FC = () => {
               <TableCell><strong>User</strong></TableCell>
               <TableCell><strong>Files</strong></TableCell>
               <TableCell><strong>Created</strong></TableCell>
-              <TableCell><strong>Actions</strong></TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
