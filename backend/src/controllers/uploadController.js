@@ -136,6 +136,23 @@ const uploadFiles = async (req, res) => {
       return res.status(400).json({ error: 'Invalid metadata format' });
     }
 
+    // Add deliverable type to metadata based on category
+    let deliverableType;
+    switch (category) {
+      case '.eml':
+        deliverableType = 'Raw Email';
+        break;
+      case '.eml + pdf':
+        deliverableType = 'Email + Attachment';
+        break;
+      case '.txt':
+        deliverableType = 'Text Message';
+        break;
+      default:
+        deliverableType = category;
+    }
+    metadataObj.deliverableType = deliverableType;
+
     const uploadedFiles = [];
     const fileHashes = {};
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -284,13 +301,13 @@ const uploadFiles = async (req, res) => {
     for (const fileInfo of uploadedFiles) {
       await new Promise((resolve, reject) => {
         db.run(
-          `INSERT INTO uploads (user_id, filename, file_type, category, s3_key, md5_hash, metadata) 
+          `INSERT INTO uploads (user_id, filename, file_type, deliverable_type, s3_key, md5_hash, metadata) 
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             req.user.id,
             fileInfo.filename,
             fileInfo.type,
-            category,
+            deliverableType,
             fileInfo.s3Key,
             fileInfo.md5Hash,
             JSON.stringify(metadataObj)
@@ -306,7 +323,7 @@ const uploadFiles = async (req, res) => {
     res.status(201).json({
       message: 'Files uploaded successfully',
       uploadedFiles: uploadedFiles,
-      category: category,
+      deliverableType: deliverableType,
       metadata: metadataObj
     });
 
@@ -337,7 +354,7 @@ const getUserUploads = async (req, res) => {
           id: upload.id,
           filename: upload.filename,
           fileType: upload.file_type,
-          category: upload.category,
+          deliverableType: upload.deliverable_type,
           md5Hash: upload.md5_hash,
           metadata: upload.metadata ? JSON.parse(upload.metadata) : {},
           uploadDate: upload.upload_date

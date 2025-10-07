@@ -101,7 +101,7 @@ const initializeDatabase = () => {
           user_id INTEGER NOT NULL,
           filename TEXT NOT NULL,
           file_type TEXT NOT NULL,
-          category TEXT NOT NULL,
+          deliverable_type TEXT NOT NULL,
           s3_key TEXT NOT NULL,
           md5_hash TEXT NOT NULL,
           metadata TEXT,
