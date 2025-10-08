@@ -83,7 +83,7 @@ const getNextAsset = async (req, res) => {
       LEFT JOIN users u ON a.user_id = u.id
       WHERE a.assigned_to = ? 
         AND a.batch_id = ? 
-        AND (a.qc_status = 'pending' OR a.qc_status IS NULL)
+        AND (a.qc_status = 'pending' OR a.qc_status = 'in_progress' OR a.qc_status IS NULL)
       ORDER BY a.created_date ASC
       LIMIT 1`,
       [userId, batchId],

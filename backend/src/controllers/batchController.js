@@ -191,12 +191,28 @@ const getBatchesByCategory = async (req, res) => {
           return res.status(500).json({ error: 'Failed to fetch assigned users' });
         }
 
-        res.json({
-          batch: {
-            ...batch,
-            batch_id: `${locale}_${bookingCategory}`.replace(/\s+/g, '_')
-          },
-          assignedUsers: users || []
+        // Get unassigned asset IDs for this batch
+        const unassignedAssetsQuery = `
+          SELECT id FROM assets 
+          WHERE json_extract(metadata, '$.locale') = ? 
+          AND json_extract(metadata, '$.bookingCategory') = ?
+          AND assigned_to IS NULL
+        `;
+
+        db.all(unassignedAssetsQuery, [locale, bookingCategory], (err, assets) => {
+          if (err) {
+            console.error('Error fetching unassigned assets:', err);
+            return res.status(500).json({ error: 'Failed to fetch unassigned assets' });
+          }
+
+          res.json({
+            batch: {
+              ...batch,
+              batch_id: `${locale}_${bookingCategory}`.replace(/\s+/g, '_')
+            },
+            assignedUsers: users || [],
+            unassignedAssetIds: assets.map(asset => asset.id)
+          });
         });
       });
     });
@@ -302,6 +318,7 @@ const assignUserToBatch = async (req, res) => {
     const { locale, bookingCategory, userId, assetIds } = req.body;
     const assignedBy = req.user.id;
     const batchId = `${locale}_${bookingCategory}`.replace(/\s+/g, '_');
+    
 
     // Start transaction
     db.serialize(() => {
@@ -325,7 +342,7 @@ const assignUserToBatch = async (req, res) => {
             db.run(
               `UPDATE assets 
                SET assigned_to = ?, batch_id = ?, qc_status = 'pending'
-               WHERE asset_id IN (${placeholders})`,
+               WHERE id IN (${placeholders})`,
               [userId, batchId, ...assetIds],
               function(err) {
                 if (err) {
