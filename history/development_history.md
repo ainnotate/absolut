@@ -348,8 +348,279 @@ Absolute/
 - Bulk user operations
 - Advanced user filtering and search
 
+## Phase 6: Uploader Dashboard and File Management System
+**Duration**: October 7, 2025  
+**Major Focus**: Complete file upload system with S3 integration and asset management
+
+### File Upload System Implementation
+
+#### Backend Infrastructure
+1. **AWS S3 Integration**
+   - Implemented AWS SDK for S3 file storage
+   - Added environment variables for AWS credentials
+   - Created secure S3 bucket configuration
+   - Implemented file upload to S3 with proper content types
+
+2. **File Upload Controller** (`uploadController.js`)
+   - Created comprehensive upload handling for multiple file types
+   - Implemented MD5 hash-based duplicate detection
+   - Added metadata processing and validation
+   - Support for three upload categories:
+     - `.eml` - Raw Email files
+     - `.eml + pdf` - Email with PDF attachment
+     - `.txt` - Text message files
+
+3. **Database Schema Enhancement**
+   - Added `uploads` table with MD5 hash uniqueness constraint
+   - Implemented user-specific duplicate detection
+   - Added metadata storage as JSON fields
+   - Created proper foreign key relationships
+
+#### Frontend Upload Interface
+
+4. **UploaderDashboard Component**
+   - Created responsive uploader interface with Material-UI
+   - Implemented drag-and-drop file upload functionality
+   - Built category-specific upload areas
+   - Added comprehensive metadata form with validation
+
+5. **Metadata Form Integration**
+   - Integrated Google Form-based metadata fields:
+     - Asset Owner Gender (Male/Female/Others)
+     - Asset Owner Age
+     - Locale (with reference codes and dropdown)
+     - Source Name
+     - Booking Category (Category-Subcategory dropdown system)
+     - Booking Type (Invitation/Confirmation/Modification/Cancellation/Deliverable Type)
+   - Added mandatory terms and conditions checkbox
+   - Implemented guidelines and QA feedback sections
+
+6. **Authentication and Access Control**
+   - Fixed role-based access for upload_user role
+   - Implemented auto-redirect for upload users to /upload dashboard
+   - Added proper JWT token handling and validation
+   - Resolved authentication middleware issues
+
+### Mobile Access Implementation
+
+7. **Network Configuration**
+   - Enabled mobile device access for development environment
+   - Updated CORS settings to allow local IP access (192.168.29.158)
+   - Configured servers to listen on all network interfaces (0.0.0.0)
+   - Updated API URLs for cross-device compatibility
+
+8. **Environment Configuration**
+   - Updated frontend .env for mobile API access
+   - Added mobile access logging for debugging
+   - Fixed port inconsistencies between services
+   - Implemented comprehensive error logging for mobile debugging
+
+### Asset-Based Architecture Implementation
+
+9. **Database Restructuring**
+   - Created new `assets` table for logical file grouping
+   - Implemented Asset ID generation system (format: AST_{user_id}_{timestamp}_{random})
+   - Restructured uploads table with asset relationships
+   - Removed redundant data through normalization
+
+10. **Asset Management Logic**
+    - One asset represents one complete deliverable:
+      - Raw Email Asset: 1 asset = 1 EML file
+      - Email + Attachment Asset: 1 asset = 1 EML + 1 PDF file
+      - Text Message Asset: 1 asset = 1 TXT file
+    - Implemented unified metadata storage per asset
+    - Created asset-file relationship management
+
+### File Naming and Organization System
+
+11. **Structured File Naming**
+    - Implemented metadata-based filename generation
+    - Format: `userId_locale_sourceName_bookingType_deliverableType_timestamp.extension`
+    - Added filesystem-safe character cleaning
+    - Implemented timezone handling (UTC format)
+
+12. **S3 Storage Organization**
+    - Hierarchical structure: `userId/locale/filename`
+    - Organized files by user and locale for easy browsing
+    - Consistent path generation across all file types
+
+### Admin Dashboard Enhancement
+
+13. **Asset Tracking System**
+    - Removed Analytics and System Settings tabs as requested
+    - Added comprehensive Asset Tracking tab with TrackChanges icon
+    - Created AssetTracking component with:
+      - Statistics dashboard showing asset counts by type
+      - Search and filter functionality
+      - Expandable table rows with detailed asset information
+      - File details, metadata display, and user information
+      - Proper user ID correlation across components
+
+14. **User Management Improvements**
+    - Added User ID column to User Management table
+    - Updated table structure with proper colSpan values
+    - Implemented monospace font styling for user IDs
+    - Ensured data consistency between components
+
+15. **UI Consistency Improvements**
+    - Standardized tab label sizing ("Users" and "Assets")
+    - Updated card titles for consistency
+    - Removed unnecessary UI elements (More Filters button)
+    - Aligned user data across admin components
+
+### Security and Environment Management
+
+16. **Secrets Management**
+    - Removed sensitive environment variables from git tracking
+    - Added .env to .gitignore for security
+    - Created .env.example template for setup
+    - Added ENVIRONMENT_SETUP.md documentation
+    - Cleaned git history of exposed credentials
+
+17. **Error Resolution and Bug Fixes**
+    - Fixed 403 Forbidden errors due to role mismatch
+    - Resolved JWT token issues in authentication
+    - Fixed file picker dialog functionality
+    - Corrected API endpoint inconsistencies
+    - Resolved React-dropzone implementation issues
+
+### Recent Git History
+
+#### Commit 4: File Upload System Foundation
+**Commit**: `64e209f` - "Implement comprehensive file upload system with duplicate detection"  
+**Description**: Complete S3 integration with MD5-based duplicate detection
+
+#### Commit 5: Enhanced Uploader Dashboard
+**Commit**: `c6ed338` - "Enhance uploader dashboard with comprehensive metadata form and terms agreement"  
+**Description**: Google Form integration, metadata fields, and terms acceptance
+
+#### Commit 6: Structured File Naming
+**Commit**: `321412f` - "Implement structured file naming and S3 organization system"  
+**Description**: Metadata-based filenames and hierarchical S3 storage
+
+#### Commit 7: Mobile Access Support
+**Commit**: `ba01540` - "Enable mobile device access for development environment"  
+**Description**: Cross-device development support with proper CORS and networking
+
+#### Commit 8: Asset-Based Architecture
+**Commit**: `917a0f5` - "Implement Asset-based database architecture for file grouping"  
+**Description**: Complete database restructuring for logical asset management
+
+#### Commit 9: Admin Dashboard Updates
+**Commit**: `5249f7a` - "Update admin dashboard with asset tracking and UI improvements"  
+**Description**: Asset tracking system, user ID columns, and UI consistency improvements
+
+#### Commit 10: Real-time Asset Tracking Implementation
+**Commit**: `083da45` - "Implement real-time asset tracking with API integration and UI improvements"  
+**Date**: October 7, 2025  
+**Description**: Complete transition from mock data to real-time asset tracking system
+
+**Major Changes:**
+1. **Backend API Development**
+   - Created `assetController.js` with proper sqlite3 compatibility
+   - Added `assetRoutes.js` with admin-only access control
+   - Integrated asset routes into main server configuration
+   - Fixed .env loading path for correct environment variable access
+
+2. **Database Migration and Fixes**
+   - Created migration scripts to add `asset_id` column to existing uploads
+   - Implemented asset grouping fix for Email + Attachment files
+   - Converted 6 separate uploads into 5 properly grouped assets
+   - Fixed database schema inconsistencies from previous migrations
+
+3. **Frontend API Integration**
+   - Replaced mock data with real API calls in AssetTracking component
+   - Added proper JWT authentication for asset endpoint access
+   - Implemented error handling for failed API requests
+   - Updated API URL for mobile device compatibility (192.168.29.158:5003)
+
+4. **UI Improvements**
+   - Removed Actions column from Asset Tracking table as requested
+   - Updated table colSpan from 7 to 6 for proper layout
+   - Cleaned up unused imports (Tooltip, Visibility, Download icons)
+   - Maintained responsive design and expandable row functionality
+
+5. **Asset Grouping Resolution**
+   - Fixed issue where Email + PDF files appeared as separate assets
+   - Implemented proper asset merging logic for related files
+   - Updated deliverable types to correctly show "Email + Attachment"
+   - Reduced total asset count from 6 to 5 with proper file grouping
+
+**Technical Achievements:**
+- Successfully connected frontend to real database via RESTful API
+- Implemented proper authentication and authorization for asset access
+- Fixed database compatibility issues between different SQLite implementations
+- Created scalable asset management system with real-time updates
+- Achieved clean UI design by removing unnecessary interface elements
+
+**Current Asset Status:**
+- 5 total assets properly tracked in the system
+- 1 "Email + Attachment" asset with 2 files (EML + PDF)
+- 3 "Raw Email" assets with 1 file each
+- 1 "Text Message" asset with 1 file
+- All assets show correct user information and timestamps
+- Real-time updates when new files are uploaded
+
+### Current System Capabilities
+
+#### Upload System Features
+1. ✅ **Multi-format File Support**: EML, PDF, TXT files with proper validation
+2. ✅ **Drag-and-Drop Interface**: Modern file upload with visual feedback
+3. ✅ **Duplicate Detection**: MD5-based prevention of duplicate uploads
+4. ✅ **Metadata Management**: Comprehensive form with Google Form integration
+5. ✅ **AWS S3 Storage**: Secure cloud storage with organized structure
+6. ✅ **Mobile Access**: Cross-device development support
+7. ✅ **Asset-Based Organization**: Logical grouping of related files
+8. ✅ **Structured Naming**: Metadata-based filename generation
+
+#### Admin Capabilities
+1. ✅ **User Management**: Complete CRUD operations with User ID tracking
+2. ✅ **Asset Tracking**: Comprehensive monitoring with search/filter
+3. ✅ **Statistics Dashboard**: Real-time counts and analytics
+4. ✅ **Security Management**: Proper access control and authentication
+
+#### Technical Achievements
+1. ✅ **Database Normalization**: Asset-based architecture with proper relationships
+2. ✅ **Security Implementation**: Secrets management and secure authentication
+3. ✅ **Cross-Platform Support**: Mobile and desktop development access
+4. ✅ **Scalable Architecture**: Organized S3 storage and efficient querying
+5. ✅ **Error Handling**: Comprehensive validation and user feedback
+
+### Updated Database Schema
+```sql
+-- New asset-based structure
+assets: id, asset_id, user_id, deliverable_type, metadata, created_date
+
+uploads: id, asset_id, user_id, filename, file_type, s3_key, md5_hash, upload_date
+
+-- Existing tables remain for user management
+users: id, username, email, password, google_id, role, first_name, last_name, profile_picture, is_active, last_login, created_at, updated_at
+```
+
+### System Architecture Updates
+
+#### File Upload Flow
+1. User selects category (Raw Email/Email + Attachment/Text Message)
+2. Files uploaded via drag-drop or file picker
+3. Metadata form completed with validation
+4. Terms and conditions accepted
+5. Asset ID generated and asset record created
+6. Files uploaded to S3 with structured naming
+7. Upload records linked to asset
+8. MD5 duplicate detection prevents re-uploads
+
+#### Asset Management Flow
+1. Assets grouped by logical deliverable units
+2. Hierarchical S3 storage: userId/locale/filename
+3. Admin can track all assets with detailed information
+4. Search and filter capabilities for asset discovery
+5. Expandable details showing metadata and file information
+
 ## Notes
 - Platform successfully created based on Fs_Image_Collection reference
-- All requested features implemented and tested
-- Ready for production deployment with proper environment configuration
+- Complete file upload and asset management system implemented
+- Mobile development support with proper networking configuration
+- Scalable architecture with asset-based organization
+- Security-focused development with proper secrets management
+- Ready for production deployment with comprehensive feature set
 - Extensible architecture allows for future feature additions
