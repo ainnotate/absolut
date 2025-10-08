@@ -7,6 +7,9 @@ const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const assetRoutes = require('./routes/assetRoutes');
+const batchRoutes = require('./routes/batchRoutes');
+const qcRoutes = require('./routes/qcRoutes');
+const supervisorRoutes = require('./routes/supervisorRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5003;
@@ -35,6 +38,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api', uploadRoutes);
 app.use('/api', assetRoutes);
+app.use('/api/batches', batchRoutes);
+app.use('/api/qc', qcRoutes);
+app.use('/api/supervisor', supervisorRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ 
