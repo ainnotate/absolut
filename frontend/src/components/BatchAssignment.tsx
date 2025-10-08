@@ -61,7 +61,7 @@ const API_BASE = 'http://192.168.29.158:5003';
 interface BookingCategoryCardProps {
   category: BookingCategoryStats;
   locale: string;
-  onAssignUser: (bookingCategory: string) => void;
+  onAssignUser: (bookingCategory: string, unassignedAssetIds: number[]) => void;
   onRemoveUser: (bookingCategory: string, userId: number, username: string) => void;
 }
 
@@ -72,6 +72,7 @@ const BookingCategoryCard: React.FC<BookingCategoryCardProps> = ({
   onRemoveUser 
 }) => {
   const [assignedUsers, setAssignedUsers] = useState<AssignedUser[]>([]);
+  const [unassignedAssetIds, setUnassignedAssetIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
 
   const fetchAssignedUsers = useCallback(async () => {
@@ -88,6 +89,7 @@ const BookingCategoryCard: React.FC<BookingCategoryCardProps> = ({
       if (response.ok) {
         const data = await response.json();
         setAssignedUsers(data.assignedUsers || []);
+        setUnassignedAssetIds(data.unassignedAssetIds || []);
       }
     } catch (error) {
       console.error('Error fetching assigned users:', error);
@@ -160,7 +162,7 @@ const BookingCategoryCard: React.FC<BookingCategoryCardProps> = ({
             variant="outlined"
             startIcon={<PersonAdd />}
             size="small"
-            onClick={() => onAssignUser(category.booking_category)}
+            onClick={() => onAssignUser(category.booking_category, unassignedAssetIds)}
           >
             Assign User
           </Button>
@@ -186,6 +188,7 @@ const BatchAssignment: React.FC = () => {
   
   // Dialog states
   const [selectedBatch, setSelectedBatch] = useState<string>('');
+  const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>([]);
   const [unassignedUsers, setUnassignedUsers] = useState<UnassignedUser[]>([]);
   
   // Snackbar
@@ -325,7 +328,8 @@ const BatchAssignment: React.FC = () => {
         body: JSON.stringify({
           locale: selectedLocale,
           bookingCategory: selectedBatch,
-          userId
+          userId,
+          assetIds: selectedAssetIds
         })
       });
 
@@ -334,6 +338,7 @@ const BatchAssignment: React.FC = () => {
         setSnackbarMessage(`User assigned successfully. ${data.assignedCount} assets assigned.`);
         setSnackbarOpen(true);
         setSelectedBatch('');
+        setSelectedAssetIds([]);
         
         // Refresh booking categories
         await fetchBookingCategoriesByLocale(selectedLocale);
@@ -539,8 +544,9 @@ const BatchAssignment: React.FC = () => {
                     key={index}
                     category={category}
                     locale={selectedLocale}
-                    onAssignUser={(bookingCategory) => {
+                    onAssignUser={(bookingCategory, unassignedAssetIds) => {
                       setSelectedBatch(bookingCategory);
+                      setSelectedAssetIds(unassignedAssetIds);
                       fetchUnassignedUsers(selectedLocale, bookingCategory);
                     }}
                     onRemoveUser={async (bookingCategory, userId, username) => {
@@ -561,6 +567,7 @@ const BatchAssignment: React.FC = () => {
         open={selectedBatch !== ''}
         onClose={() => {
           setSelectedBatch('');
+          setSelectedAssetIds([]);
           setUserSearch('');
         }}
         maxWidth="sm"
@@ -570,6 +577,9 @@ const BatchAssignment: React.FC = () => {
         <DialogContent>
           <Typography variant="body2" color="text.secondary" gutterBottom>
             Batch: <strong>{selectedBatch}</strong>
+          </Typography>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Assets to assign: <strong>{selectedAssetIds.length}</strong>
           </Typography>
           <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 2 }}>
             Select a user to assign to this batch:
@@ -614,6 +624,7 @@ const BatchAssignment: React.FC = () => {
         <DialogActions>
           <Button onClick={() => {
             setSelectedBatch('');
+            setSelectedAssetIds([]);
             setUserSearch('');
           }}>Cancel</Button>
         </DialogActions>

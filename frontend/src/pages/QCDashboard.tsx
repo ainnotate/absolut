@@ -255,17 +255,17 @@ const QCDashboard: React.FC = () => {
                     <ListItem>
                       <ListItemText
                         primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="h6">
-                              {batch.locale} - {batch.deliverable_type}
-                            </Typography>
+                          <Typography variant="h6" component="div" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <span>{batch.locale} - {batch.deliverable_type}</span>
                             <Chip 
                               label={`${getCompletionPercentage(batch)}% Complete`}
                               color={getStatusColor(batch)}
                               size="small"
                             />
-                          </Box>
+                          </Typography>
                         }
+                        primaryTypographyProps={{ component: 'div' }}
+                        secondaryTypographyProps={{ component: 'div' }}
                         secondary={
                           <Box sx={{ mt: 1 }}>
                             <Typography variant="body2" color="text.secondary">
