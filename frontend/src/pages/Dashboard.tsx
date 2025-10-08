@@ -24,6 +24,10 @@ const Dashboard: React.FC = () => {
         window.location.href = '/admin';
       } else if (user.role === 'upload_user') {
         window.location.href = '/upload';
+      } else if (user.role === 'qc_user') {
+        window.location.href = '/qc';
+      } else if (user.role === 'supervisor') {
+        window.location.href = '/supervisor';
       }
     }
   }, [user]);
@@ -173,7 +177,7 @@ const Dashboard: React.FC = () => {
                   <Typography variant="body2" color="text.secondary">
                     Review and override QC decisions when necessary.
                   </Typography>
-                  <Button variant="contained" sx={{ mt: 2 }}>
+                  <Button variant="contained" sx={{ mt: 2 }} onClick={() => window.location.href = '/supervisor'}>
                     QC Review
                   </Button>
                 </CardContent>
@@ -224,7 +228,7 @@ const Dashboard: React.FC = () => {
                   <Typography variant="body2" color="text.secondary">
                     Review uploaded files and approve or reject submissions.
                   </Typography>
-                  <Button variant="contained" sx={{ mt: 2 }}>
+                  <Button variant="contained" sx={{ mt: 2 }} onClick={() => window.location.href = '/qc'}>
                     Start Reviewing
                   </Button>
                 </CardContent>

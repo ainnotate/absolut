@@ -16,11 +16,13 @@ import {
   Logout,
   People,
   Dashboard as DashboardIcon,
-  TrackChanges
+  TrackChanges,
+  Assignment
 } from '@mui/icons-material';
 import { authService } from '../services/authService';
 import UserManagement from '../components/UserManagement';
 import AssetTracking from '../components/AssetTracking';
+import BatchAssignment from '../components/BatchAssignment';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -126,6 +128,27 @@ const AdminPanel: React.FC = () => {
         </Card>
       </Grid>
 
+      <Grid item xs={12} sm={6} md={4}>
+        <Card>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Assignment color="primary" sx={{ mr: 2 }} />
+              <Typography variant="h6">Batch Assignment</Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Assign QC users to specific batches based on locale and deliverable type. Monitor assignment progress.
+            </Typography>
+            <Button 
+              variant="outlined" 
+              onClick={() => setTabValue(3)}
+              fullWidth
+            >
+              Manage Batches
+            </Button>
+          </CardContent>
+        </Card>
+      </Grid>
+
       <Grid item xs={12}>
         <Card>
           <CardContent>
@@ -201,6 +224,13 @@ const AdminPanel: React.FC = () => {
               id="admin-tab-2"
               aria-controls="admin-tabpanel-2"
             />
+            <Tab 
+              icon={<Assignment />} 
+              label="Batch Assignment" 
+              iconPosition="start"
+              id="admin-tab-3"
+              aria-controls="admin-tabpanel-3"
+            />
           </Tabs>
         </Box>
 
@@ -214,6 +244,10 @@ const AdminPanel: React.FC = () => {
 
         <TabPanel value={tabValue} index={2}>
           <AssetTracking />
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={3}>
+          <BatchAssignment />
         </TabPanel>
       </Container>
     </Box>

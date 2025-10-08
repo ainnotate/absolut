@@ -6,6 +6,10 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
 import UploaderDashboard from './pages/UploaderDashboard';
+import QCDashboard from './pages/QCDashboard';
+import QCInterface from './pages/QCInterface';
+import SupervisorDashboard from './pages/SupervisorDashboard';
+import SupervisorReview from './pages/SupervisorReview';
 import { authService } from './services/authService';
 
 const theme = createTheme({
@@ -31,6 +35,18 @@ const AdminRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const UploaderRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const user = authService.getUser();
   const allowedRoles = ['upload_user', 'admin'];
+  return authService.isAuthenticated() && allowedRoles.includes(user?.role || '') ? <>{children}</> : <Navigate to="/dashboard" />;
+};
+
+const QCRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const user = authService.getUser();
+  const allowedRoles = ['qc_user', 'admin'];
+  return authService.isAuthenticated() && allowedRoles.includes(user?.role || '') ? <>{children}</> : <Navigate to="/dashboard" />;
+};
+
+const SupervisorRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const user = authService.getUser();
+  const allowedRoles = ['supervisor', 'admin'];
   return authService.isAuthenticated() && allowedRoles.includes(user?.role || '') ? <>{children}</> : <Navigate to="/dashboard" />;
 };
 
@@ -74,6 +90,38 @@ const App: React.FC = () => {
               <UploaderRoute>
                 <UploaderDashboard />
               </UploaderRoute>
+            } 
+          />
+          <Route 
+            path="/qc" 
+            element={
+              <QCRoute>
+                <QCDashboard />
+              </QCRoute>
+            } 
+          />
+          <Route 
+            path="/qc/review/:batchId" 
+            element={
+              <QCRoute>
+                <QCInterface />
+              </QCRoute>
+            } 
+          />
+          <Route 
+            path="/supervisor" 
+            element={
+              <SupervisorRoute>
+                <SupervisorDashboard />
+              </SupervisorRoute>
+            } 
+          />
+          <Route 
+            path="/supervisor/review" 
+            element={
+              <SupervisorRoute>
+                <SupervisorReview />
+              </SupervisorRoute>
             } 
           />
           <Route path="*" element={<Navigate to="/" />} />
