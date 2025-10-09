@@ -308,38 +308,6 @@ const QCDashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Quick Instructions */}
-        <Card sx={{ mt: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Quick Instructions
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <Typography variant="body2" paragraph>
-                  <strong>1. Select a Batch:</strong> Click "Start Review" on any assigned batch to begin quality control.
-                </Typography>
-                <Typography variant="body2" paragraph>
-                  <strong>2. Review Assets:</strong> Each asset contains files that need to be reviewed for quality and accuracy.
-                </Typography>
-                <Typography variant="body2" paragraph>
-                  <strong>3. Edit Metadata:</strong> Verify and correct any metadata fields as needed.
-                </Typography>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography variant="body2" paragraph>
-                  <strong>4. Accept/Reject:</strong> Approve quality assets or reject with clear reasons.
-                </Typography>
-                <Typography variant="body2" paragraph>
-                  <strong>5. Supervisor Consultation:</strong> Flag complex cases for supervisor review when needed.
-                </Typography>
-                <Typography variant="body2" paragraph>
-                  <strong>6. File Translation:</strong> Use the translation feature to understand file content in different languages.
-                </Typography>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
       </Container>
     </Box>
   );
