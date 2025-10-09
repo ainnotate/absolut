@@ -282,9 +282,12 @@ const AdminPanel: React.FC = () => {
         <Grid item xs={12} md={8}>
           <Card>
             <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Locale-wise Progress
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Box sx={{ mr: 1 }}>📊</Box>
+                <Typography variant="h6">
+                  Locale-wise Progress
+                </Typography>
+              </Box>
               
               <TextField
                 placeholder="Search locale..."
@@ -302,38 +305,100 @@ const AdminPanel: React.FC = () => {
                 sx={{ mb: 3, width: 300 }}
               />
 
-              <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
-                {filteredLocaleProgress.map((locale) => {
-                  const completionRate = locale.total > 0 ? (locale.completed / locale.total) * 100 : 0;
-                  return (
-                    <Box key={locale.locale} sx={{ mb: 2 }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                        <Typography variant="body2" fontWeight="medium">
-                          {locale.locale}
-                        </Typography>
-                        <Typography variant="body2" color="textSecondary">
-                          {locale.completed}/{locale.total} ({completionRate.toFixed(0)}%)
-                        </Typography>
-                      </Box>
-                      <LinearProgress
-                        variant="determinate"
-                        value={completionRate}
+              {/* Bar Chart */}
+              <Box sx={{ height: 300, position: 'relative' }}>
+                {/* Y-axis labels */}
+                <Box sx={{ position: 'absolute', left: -10, top: 0, height: '100%', display: 'flex', flexDirection: 'column-reverse', justifyContent: 'space-between', py: 2 }}>
+                  {(() => {
+                    const maxTotal = filteredLocaleProgress.length > 0 ? Math.max(...filteredLocaleProgress.map(l => l.total), 60) : 60;
+                    const step = Math.ceil(maxTotal / 4);
+                    return [0, step, step * 2, step * 3, maxTotal].map((value) => (
+                      <Typography key={value} variant="caption" color="textSecondary" sx={{ fontSize: '11px' }}>
+                        {value}
+                      </Typography>
+                    ));
+                  })()}
+                </Box>
+                
+                {/* Chart area */}
+                <Box sx={{ ml: 3, height: '100%', position: 'relative', border: '1px solid #e0e0e0', borderRadius: 1 }}>
+                  {/* Grid lines */}
+                  <Box sx={{ position: 'absolute', width: '100%', height: '100%' }}>
+                    {[20, 40, 60, 80].map((percent) => (
+                      <Box
+                        key={percent}
                         sx={{
-                          height: 8,
-                          borderRadius: 4,
-                          '& .MuiLinearProgress-bar': {
-                            backgroundColor: '#4caf50'
-                          }
+                          position: 'absolute',
+                          bottom: `${percent}%`,
+                          width: '100%',
+                          height: '1px',
+                          backgroundColor: '#f0f0f0'
                         }}
                       />
-                    </Box>
-                  );
-                })}
-                {filteredLocaleProgress.length === 0 && (
-                  <Typography color="textSecondary" sx={{ textAlign: 'center', py: 2 }}>
-                    No locales found
-                  </Typography>
-                )}
+                    ))}
+                  </Box>
+                  
+                  {/* Bars */}
+                  <Box sx={{ display: 'flex', alignItems: 'flex-end', height: '100%', px: 4, py: 2 }}>
+                    {filteredLocaleProgress.length > 0 ? filteredLocaleProgress.map((locale, index) => {
+                      // Find the maximum total across all locales to scale properly
+                      const maxTotal = Math.max(...filteredLocaleProgress.map(l => l.total), 60);
+                      const scaleHeight = 250; // Max height in pixels
+                      
+                      const completedHeight = (locale.completed / maxTotal) * scaleHeight;
+                      const remainingHeight = ((locale.total - locale.completed) / maxTotal) * scaleHeight;
+                      
+                      return (
+                        <Box key={locale.locale} sx={{ flex: 1, mx: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          {/* Bar Container */}
+                          <Box sx={{ width: 80, height: scaleHeight, display: 'flex', flexDirection: 'column-reverse', position: 'relative' }}>
+                            {/* Completed (green) part at bottom */}
+                            <Box
+                              sx={{
+                                width: '100%',
+                                height: `${completedHeight}px`,
+                                backgroundColor: '#4caf50',
+                                borderRadius: '2px 2px 0 0'
+                              }}
+                            />
+                            {/* Remaining (gray) part on top */}
+                            <Box
+                              sx={{
+                                width: '100%',
+                                height: `${remainingHeight}px`,
+                                backgroundColor: '#e0e0e0',
+                                borderRadius: remainingHeight > 0 ? '2px 2px 0 0' : '0'
+                              }}
+                            />
+                          </Box>
+                          {/* Locale label */}
+                          <Typography variant="body2" sx={{ mt: 1, fontWeight: 'medium', textAlign: 'center' }}>
+                            {locale.locale}
+                          </Typography>
+                        </Box>
+                      );
+                    }) : (
+                      // Show placeholder if no data
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', width: '100%' }}>
+                        <Typography color="textSecondary">
+                          No locale data available
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+
+              {/* Legend */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, gap: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Box sx={{ width: 12, height: 12, backgroundColor: '#4caf50', mr: 1 }} />
+                  <Typography variant="caption">Completed</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Box sx={{ width: 12, height: 12, backgroundColor: '#d0d0d0', mr: 1 }} />
+                  <Typography variant="caption">Remaining</Typography>
+                </Box>
               </Box>
             </CardContent>
           </Card>
@@ -350,10 +415,21 @@ const AdminPanel: React.FC = () => {
                 <Box sx={{ position: 'relative', display: 'inline-flex' }}>
                   <CircularProgress
                     variant="determinate"
+                    value={100}
+                    size={120}
+                    thickness={8}
+                    sx={{ color: '#e0e0e0' }}
+                  />
+                  <CircularProgress
+                    variant="determinate"
                     value={overallProgress.total > 0 ? (overallProgress.completed / overallProgress.total) * 100 : 0}
                     size={120}
-                    thickness={4}
-                    sx={{ color: '#4caf50' }}
+                    thickness={8}
+                    sx={{ 
+                      color: '#4caf50',
+                      position: 'absolute',
+                      left: 0
+                    }}
                   />
                   <Box
                     sx={{
@@ -376,19 +452,12 @@ const AdminPanel: React.FC = () => {
                   </Box>
                 </Box>
                 
-                <Box sx={{ mt: 2, textAlign: 'center' }}>
-                  <Typography variant="body2" color="textSecondary">
-                    <Box component="span" sx={{ color: '#4caf50', fontWeight: 'bold' }}>
-                      ● Completed: {overallProgress.completed}
-                    </Box>
+                <Box sx={{ mt: 3, textAlign: 'right', alignSelf: 'flex-end' }}>
+                  <Typography variant="body2" sx={{ color: '#4caf50', fontWeight: 'medium', mb: 1 }}>
+                    Completed: {overallProgress.completed} ({overallProgress.total > 0 ? Math.round((overallProgress.completed / overallProgress.total) * 100) : 0}%)
                   </Typography>
-                  <Typography variant="body2" color="textSecondary">
-                    <Box component="span" sx={{ color: '#9e9e9e', fontWeight: 'bold' }}>
-                      ● Remaining: {overallProgress.total - overallProgress.completed}
-                    </Box>
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                    Total Assets: {overallProgress.total}
+                  <Typography variant="body2" sx={{ color: '#9e9e9e', fontWeight: 'medium' }}>
+                    Remaining: {overallProgress.total - overallProgress.completed} ({overallProgress.total > 0 ? Math.round(((overallProgress.total - overallProgress.completed) / overallProgress.total) * 100) : 0}%)
                   </Typography>
                 </Box>
               </Box>
@@ -429,19 +498,29 @@ const AdminPanel: React.FC = () => {
               aria-controls="admin-tabpanel-1"
             />
             <Tab 
-              label="Data Export" 
+              label="Metadata" 
               id="admin-tab-2"
               aria-controls="admin-tabpanel-2"
             />
             <Tab 
-              label="Reset & Reassign" 
+              label="Progress" 
               id="admin-tab-3"
               aria-controls="admin-tabpanel-3"
             />
             <Tab 
-              label="Batch Assignment" 
+              label="Data Export" 
               id="admin-tab-4"
               aria-controls="admin-tabpanel-4"
+            />
+            <Tab 
+              label="Reset & Reassign" 
+              id="admin-tab-5"
+              aria-controls="admin-tabpanel-5"
+            />
+            <Tab 
+              label="Batch Assignment" 
+              id="admin-tab-6"
+              aria-controls="admin-tabpanel-6"
             />
           </Tabs>
         </Box>
@@ -457,6 +536,28 @@ const AdminPanel: React.FC = () => {
         <TabPanel value={tabValue} index={2}>
           <Box sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom>
+              Metadata
+            </Typography>
+            <Typography color="textSecondary" paragraph>
+              Manage asset metadata and configurations. This feature will be implemented soon.
+            </Typography>
+          </Box>
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={3}>
+          <Box sx={{ p: 3 }}>
+            <Typography variant="h5" gutterBottom>
+              Progress
+            </Typography>
+            <Typography color="textSecondary" paragraph>
+              View detailed progress reports and analytics. This feature will be implemented soon.
+            </Typography>
+          </Box>
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={4}>
+          <Box sx={{ p: 3 }}>
+            <Typography variant="h5" gutterBottom>
               Data Export
             </Typography>
             <Typography color="textSecondary" paragraph>
@@ -468,7 +569,7 @@ const AdminPanel: React.FC = () => {
           </Box>
         </TabPanel>
 
-        <TabPanel value={tabValue} index={3}>
+        <TabPanel value={tabValue} index={5}>
           <Box sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom>
               Reset & Reassign
@@ -482,7 +583,7 @@ const AdminPanel: React.FC = () => {
           </Box>
         </TabPanel>
 
-        <TabPanel value={tabValue} index={4}>
+        <TabPanel value={tabValue} index={6}>
           <BatchAssignment />
         </TabPanel>
       </Container>
