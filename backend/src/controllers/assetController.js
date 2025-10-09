@@ -121,6 +121,211 @@ const getAssets = async (req, res) => {
   }
 };
 
+const resetAndReassignAssets = async (req, res) => {
+  try {
+    const { currentUser, locale, bookingCategory, newUser } = req.body;
+
+    if (!currentUser || !locale || !bookingCategory || !newUser) {
+      return res.status(400).json({
+        success: false,
+        error: 'All fields are required: currentUser, locale, bookingCategory, newUser'
+      });
+    }
+
+    // Get user details for response
+    const getUserQuery = `SELECT username FROM users WHERE id = ?`;
+    
+    db.get(getUserQuery, [newUser], (err, user) => {
+      if (err) {
+        console.error('Error fetching new user:', err);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to fetch user details'
+        });
+      }
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'New user not found'
+        });
+      }
+
+      // Build the WHERE clause for filtering assets
+      let whereClause = `WHERE assigned_to = ?`;
+      let params = [currentUser];
+
+      // Add locale filter - check both JSON and text metadata
+      whereClause += ` AND (
+        (metadata LIKE ? OR metadata LIKE ?)
+      )`;
+      params.push(`%"locale":"${locale}"%`);
+      params.push(`%"locale": "${locale}"%`);
+
+      // Add booking category filter
+      whereClause += ` AND (
+        (metadata LIKE ? OR metadata LIKE ?)
+      )`;
+      params.push(`%"bookingCategory":"${bookingCategory}"%`);
+      params.push(`%"bookingCategory": "${bookingCategory}"%`);
+
+      // First, get count of matching assets
+      const countQuery = `
+        SELECT COUNT(*) as count
+        FROM assets
+        ${whereClause}
+      `;
+
+      db.get(countQuery, params, (err, countResult) => {
+        if (err) {
+          console.error('Error counting assets:', err);
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to count matching assets'
+          });
+        }
+
+        const affectedCount = countResult.count;
+
+        if (affectedCount === 0) {
+          return res.json({
+            success: true,
+            message: 'No assets found matching the specified criteria',
+            affectedAssets: 0,
+            newUserName: user.username
+          });
+        }
+
+        // First, get the existing batch assignments for these assets
+        const getBatchQuery = `
+          SELECT DISTINCT batch_id
+          FROM assets
+          ${whereClause}
+          AND batch_id IS NOT NULL
+        `;
+
+        db.all(getBatchQuery, params, (err, existingBatches) => {
+          if (err) {
+            console.error('Error fetching existing batches:', err);
+            return res.status(500).json({
+              success: false,
+              error: 'Failed to fetch existing batch information'
+            });
+          }
+
+          // Reset QC status and reassign assets (keep existing batch_id if exists)
+          const updateQuery = `
+            UPDATE assets
+            SET 
+              assigned_to = ?,
+              qc_status = 'pending',
+              qc_completed_by = NULL,
+              qc_completed_date = NULL,
+              qc_notes = NULL
+            ${whereClause}
+          `;
+
+          const updateParams = [newUser, ...params];
+
+          db.run(updateQuery, updateParams, function(err) {
+            if (err) {
+              console.error('Error updating assets:', err);
+              return res.status(500).json({
+                success: false,
+                error: 'Failed to reset and reassign assets'
+              });
+            }
+
+            // Update existing batch assignments to point to the new user
+            if (existingBatches.length > 0) {
+              let batchUpdatesCompleted = 0;
+              const totalBatchUpdates = existingBatches.length;
+
+              existingBatches.forEach(batch => {
+                const updateBatchQuery = `
+                  UPDATE batch_assignments 
+                  SET user_id = ?, assigned_by = ?, assigned_at = CURRENT_TIMESTAMP,
+                      assigned_assets = ?, completed_assets = 0
+                  WHERE batch_id = ?
+                `;
+
+                db.run(updateBatchQuery, [newUser, req.user.id, affectedCount, batch.batch_id], (batchErr) => {
+                  if (batchErr) {
+                    console.error('Error updating batch assignment:', batchErr);
+                  }
+                  
+                  batchUpdatesCompleted++;
+                  if (batchUpdatesCompleted === totalBatchUpdates) {
+                    res.json({
+                      success: true,
+                      message: `Successfully reset and reassigned ${affectedCount} assets in ${totalBatchUpdates} batch(es)`,
+                      affectedAssets: affectedCount,
+                      newUserName: user.username,
+                      updatedBatches: existingBatches.map(b => b.batch_id)
+                    });
+                  }
+                });
+              });
+            } else {
+              // No existing batches, create a new one
+              const batchId = `${locale}_${bookingCategory}_${Date.now()}`.replace(/\s+/g, '_');
+              
+              // Update assets with new batch_id
+              const setBatchQuery = `
+                UPDATE assets 
+                SET batch_id = ?
+                ${whereClause}
+              `;
+              
+              db.run(setBatchQuery, [batchId, ...params], (setBatchErr) => {
+                if (setBatchErr) {
+                  console.error('Error setting batch_id:', setBatchErr);
+                }
+
+                // Create new batch assignment
+                const insertBatchQuery = `
+                  INSERT INTO batch_assignments 
+                  (batch_id, locale, booking_category, user_id, total_assets, assigned_assets, assigned_by)
+                  VALUES (?, ?, ?, ?, ?, ?, ?)
+                `;
+
+                db.run(insertBatchQuery, [
+                  batchId,
+                  locale,
+                  bookingCategory,
+                  newUser,
+                  affectedCount,
+                  affectedCount,
+                  req.user.id
+                ], (batchErr) => {
+                  if (batchErr) {
+                    console.error('Error creating batch assignment:', batchErr);
+                  }
+
+                  res.json({
+                    success: true,
+                    message: `Successfully reset and reassigned ${affectedCount} assets to new batch ${batchId}`,
+                    affectedAssets: affectedCount,
+                    newUserName: user.username,
+                    batchId: batchId
+                  });
+                });
+              });
+            }
+          });
+        });
+      });
+    });
+  } catch (error) {
+    console.error('Error in resetAndReassignAssets:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+};
+
 module.exports = {
-  getAssets
+  getAssets,
+  resetAndReassignAssets
 };

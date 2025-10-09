@@ -16,7 +16,8 @@ import {
   LinearProgress,
   Paper,
   CircularProgress,
-  Alert
+  Alert,
+  MenuItem
 } from '@mui/material';
 import {
   Logout,
@@ -72,6 +73,19 @@ interface LocaleProgress {
   total: number;
 }
 
+interface ResetFormData {
+  currentUser: string;
+  locale: string;
+  bookingCategory: string;
+  newUser: string;
+}
+
+interface User {
+  id: number;
+  username: string;
+  role: string;
+}
+
 const AdminPanel: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
@@ -79,6 +93,16 @@ const AdminPanel: React.FC = () => {
   const [overallProgress, setOverallProgress] = useState({ completed: 0, total: 0 });
   const [loading, setLoading] = useState(false);
   const [searchLocale, setSearchLocale] = useState('');
+  const [resetForm, setResetForm] = useState<ResetFormData>({
+    currentUser: '',
+    locale: '',
+    bookingCategory: '',
+    newUser: ''
+  });
+  const [qcUsers, setQcUsers] = useState<User[]>([]);
+  const [availableLocales, setAvailableLocales] = useState<string[]>([]);
+  const [availableBookingCategories, setAvailableBookingCategories] = useState<string[]>([]);
+  const [resetLoading, setResetLoading] = useState(false);
   const currentUser = authService.getUser();
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -88,6 +112,8 @@ const AdminPanel: React.FC = () => {
   useEffect(() => {
     if (tabValue === 0) {
       fetchDashboardData();
+    } else if (tabValue === 4) {
+      fetchResetFormData();
     }
   }, [tabValue]);
 
@@ -163,6 +189,112 @@ const AdminPanel: React.FC = () => {
       console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchResetFormData = async () => {
+    try {
+      const token = authService.getToken();
+      
+      // Fetch QC users
+      const usersResponse = await fetch('http://localhost:5003/api/users/', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const usersData = await usersResponse.json();
+      
+      if (usersData.users) {
+        const qcUsersList = usersData.users.filter((user: any) => user.role === 'qc_user');
+        setQcUsers(qcUsersList);
+      }
+
+      // Fetch available locales from assets
+      const assetsResponse = await fetch('http://localhost:5003/api/assets', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const assetsData = await assetsResponse.json();
+      
+      if (assetsData.assets) {
+        const locales = new Set<string>();
+        const bookingCategories = new Set<string>();
+        
+        assetsData.assets.forEach((asset: any) => {
+          if (asset.metadata) {
+            try {
+              const metadata = typeof asset.metadata === 'string' ? JSON.parse(asset.metadata) : asset.metadata;
+              
+              // Collect locales
+              if (metadata.locale && metadata.locale.trim() !== '') {
+                locales.add(metadata.locale);
+              }
+              
+              // Collect booking categories
+              if (metadata.bookingCategory && metadata.bookingCategory.trim() !== '') {
+                bookingCategories.add(metadata.bookingCategory);
+              }
+            } catch (e) {
+              // Skip invalid metadata
+            }
+          }
+        });
+        
+        setAvailableLocales(Array.from(locales).sort());
+        setAvailableBookingCategories(Array.from(bookingCategories).sort());
+      }
+    } catch (error) {
+      console.error('Error fetching reset form data:', error);
+    }
+  };
+
+  const handleResetFormChange = (field: keyof ResetFormData, value: string) => {
+    setResetForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const canSubmitReset = () => {
+    return resetForm.currentUser && resetForm.locale && resetForm.bookingCategory && resetForm.newUser;
+  };
+
+  const handleResetAndReassign = async () => {
+    if (!canSubmitReset()) return;
+    
+    setResetLoading(true);
+    try {
+      const token = authService.getToken();
+      
+      const response = await fetch('http://localhost:5003/api/admin/reset-reassign', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(resetForm)
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        alert(`Success! Reset and reassigned ${result.affectedAssets} assets to ${result.newUserName}`);
+        // Reset form
+        setResetForm({
+          currentUser: '',
+          locale: '',
+          bookingCategory: '',
+          newUser: ''
+        });
+        // Refresh dashboard data if on overview tab
+        if (tabValue === 0) {
+          fetchDashboardData();
+        }
+      } else {
+        alert(`Error: ${result.error || 'Failed to reset and reassign assets'}`);
+      }
+    } catch (error) {
+      console.error('Error resetting and reassigning:', error);
+      alert('Error: Failed to reset and reassign assets');
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -477,7 +609,17 @@ const AdminPanel: React.FC = () => {
 
       <Container maxWidth="xl" sx={{ mt: 2 }}>
         <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={handleTabChange} aria-label="admin tabs">
+          <Tabs 
+            value={tabValue} 
+            onChange={handleTabChange} 
+            aria-label="admin tabs"
+            variant="fullWidth"
+            sx={{
+              '& .MuiTabs-flexContainer': {
+                justifyContent: 'space-between'
+              }
+            }}
+          >
             <Tab 
               label="Overview" 
               id="admin-tab-0"
@@ -489,29 +631,24 @@ const AdminPanel: React.FC = () => {
               aria-controls="admin-tabpanel-1"
             />
             <Tab 
-              label="Metadata" 
+              label="Progress" 
               id="admin-tab-2"
               aria-controls="admin-tabpanel-2"
             />
             <Tab 
-              label="Progress" 
+              label="Data Export" 
               id="admin-tab-3"
               aria-controls="admin-tabpanel-3"
             />
             <Tab 
-              label="Data Export" 
+              label="Reset & Reassign" 
               id="admin-tab-4"
               aria-controls="admin-tabpanel-4"
             />
             <Tab 
-              label="Reset & Reassign" 
+              label="Batch Assignment" 
               id="admin-tab-5"
               aria-controls="admin-tabpanel-5"
-            />
-            <Tab 
-              label="Batch Assignment" 
-              id="admin-tab-6"
-              aria-controls="admin-tabpanel-6"
             />
           </Tabs>
         </Box>
@@ -527,17 +664,6 @@ const AdminPanel: React.FC = () => {
         <TabPanel value={tabValue} index={2}>
           <Box sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom>
-              Metadata
-            </Typography>
-            <Typography color="textSecondary" paragraph>
-              Manage asset metadata and configurations. This feature will be implemented soon.
-            </Typography>
-          </Box>
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={3}>
-          <Box sx={{ p: 3 }}>
-            <Typography variant="h5" gutterBottom>
               Progress
             </Typography>
             <Typography color="textSecondary" paragraph>
@@ -546,7 +672,7 @@ const AdminPanel: React.FC = () => {
           </Box>
         </TabPanel>
 
-        <TabPanel value={tabValue} index={4}>
+        <TabPanel value={tabValue} index={3}>
           <Box sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom>
               Data Export
@@ -560,21 +686,165 @@ const AdminPanel: React.FC = () => {
           </Box>
         </TabPanel>
 
-        <TabPanel value={tabValue} index={5}>
+        <TabPanel value={tabValue} index={4}>
           <Box sx={{ p: 3 }}>
-            <Typography variant="h5" gutterBottom>
-              Reset & Reassign
+            <Typography variant="body1" color="textSecondary" gutterBottom>
+              Reset QC status for assets and reassign them to a new user based on user, region, and sub-category filters
             </Typography>
-            <Typography color="textSecondary" paragraph>
-              Reset user assignments and reassign tasks. This feature will be implemented soon.
-            </Typography>
-            <Button variant="outlined" startIcon={<RestartAlt />}>
-              Reset Assignments
-            </Button>
+            
+            <Card sx={{ mt: 3, maxWidth: 800, mx: 'auto' }}>
+              <CardContent sx={{ p: 4 }}>
+                {/* Header with icon and title */}
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 4 }}>
+                  <RestartAlt sx={{ fontSize: 40, color: 'warning.main', mr: 2 }} />
+                  <Typography variant="h5" fontWeight="bold">
+                    Reset QC Status & Reassign
+                  </Typography>
+                </Box>
+
+                {/* Filter Grid */}
+                <Grid container spacing={3} sx={{ mb: 4 }}>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      select
+                      label="Current User"
+                      variant="outlined"
+                      required
+                      value={resetForm.currentUser}
+                      onChange={(e) => handleResetFormChange('currentUser', e.target.value)}
+                    >
+                      {qcUsers.map((user) => (
+                        <MenuItem key={user.id} value={user.id.toString()}>
+                          {user.username}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      select
+                      label="Locale"
+                      variant="outlined"
+                      required
+                      value={resetForm.locale}
+                      onChange={(e) => handleResetFormChange('locale', e.target.value)}
+                    >
+                      {availableLocales.map((locale) => (
+                        <MenuItem key={locale} value={locale}>
+                          {locale}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      select
+                      label="Booking Category"
+                      variant="outlined"
+                      required
+                      value={resetForm.bookingCategory}
+                      onChange={(e) => handleResetFormChange('bookingCategory', e.target.value)}
+                    >
+                      {availableBookingCategories.map((category) => (
+                        <MenuItem key={category} value={category}>
+                          {category}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      fullWidth
+                      select
+                      label="New User"
+                      variant="outlined"
+                      required
+                      value={resetForm.newUser}
+                      onChange={(e) => handleResetFormChange('newUser', e.target.value)}
+                    >
+                      {qcUsers.map((user) => (
+                        <MenuItem key={user.id} value={user.id.toString()}>
+                          {user.username}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                </Grid>
+
+                {/* Warning Box */}
+                <Box sx={{ 
+                  bgcolor: '#fff3cd', 
+                  border: '1px solid #ffeaa7', 
+                  borderRadius: 1, 
+                  p: 3, 
+                  mb: 4 
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                    <Box sx={{ 
+                      width: 0, 
+                      height: 0, 
+                      borderLeft: '8px solid transparent',
+                      borderRight: '8px solid transparent',
+                      borderBottom: '12px solid #f39c12',
+                      mr: 2,
+                      mt: 0.5
+                    }} />
+                    <Box>
+                      <Typography variant="body2" fontWeight="bold" color="#856404" gutterBottom>
+                        Warning: This action will:
+                      </Typography>
+                      <Box component="ul" sx={{ m: 0, pl: 2, color: '#856404' }}>
+                        <Typography component="li" variant="body2">
+                          Reset all QC status for assets matching the selected filters
+                        </Typography>
+                        <Typography component="li" variant="body2">
+                          Reassign all matching assets to the new user
+                        </Typography>
+                        <Typography component="li" variant="body2">
+                          This action cannot be undone
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </Box>
+                </Box>
+
+                {/* Action Button */}
+                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                  <Button
+                    variant="contained"
+                    size="large"
+                    disabled={!canSubmitReset() || resetLoading}
+                    onClick={handleResetAndReassign}
+                    startIcon={resetLoading ? <CircularProgress size={20} color="inherit" /> : <RestartAlt />}
+                    sx={{
+                      bgcolor: canSubmitReset() && !resetLoading ? '#f44336' : '#e0e0e0',
+                      color: canSubmitReset() && !resetLoading ? '#fff' : '#9e9e9e',
+                      px: 6,
+                      py: 1.5,
+                      '&:hover': {
+                        bgcolor: canSubmitReset() && !resetLoading ? '#d32f2f' : '#e0e0e0'
+                      },
+                      '&:disabled': {
+                        bgcolor: '#e0e0e0',
+                        color: '#9e9e9e'
+                      }
+                    }}
+                  >
+                    {resetLoading ? 'PROCESSING...' : 'RESET & REASSIGN ASSETS'}
+                  </Button>
+                </Box>
+              </CardContent>
+            </Card>
           </Box>
         </TabPanel>
 
-        <TabPanel value={tabValue} index={6}>
+        <TabPanel value={tabValue} index={5}>
           <BatchAssignment />
         </TabPanel>
       </Container>
