@@ -97,7 +97,7 @@ const AdminPanel: React.FC = () => {
       const token = authService.getToken();
       
       // Fetch user statistics
-      const userResponse = await fetch('http://localhost:5003/api/admin/users', {
+      const userResponse = await fetch('http://localhost:5003/api/users/', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const userData = await userResponse.json();
@@ -113,7 +113,7 @@ const AdminPanel: React.FC = () => {
       }
 
       // Fetch asset progress by locale
-      const assetResponse = await fetch('http://localhost:5003/api/admin/assets', {
+      const assetResponse = await fetch('http://localhost:5003/api/assets', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const assetData = await assetResponse.json();
@@ -207,16 +207,13 @@ const AdminPanel: React.FC = () => {
             <Grid item xs={12} sm={6} md={3}>
               <Card>
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography color="textSecondary" gutterBottom variant="h6">
-                        Total Users
-                      </Typography>
-                      <Typography variant="h4">
-                        {dashboardStats?.totalUsers || 0}
-                      </Typography>
-                    </Box>
-                    <Group color="primary" sx={{ fontSize: 40 }} />
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h2" color="primary" sx={{ fontWeight: 'bold' }}>
+                      {dashboardStats?.totalUsers || 0}
+                    </Typography>
+                    <Typography color="textSecondary" variant="body1">
+                      Total Users
+                    </Typography>
                   </Box>
                 </CardContent>
               </Card>
@@ -225,16 +222,13 @@ const AdminPanel: React.FC = () => {
             <Grid item xs={12} sm={6} md={3}>
               <Card>
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography color="textSecondary" gutterBottom variant="h6">
-                        Admin Users
-                      </Typography>
-                      <Typography variant="h4">
-                        {dashboardStats?.adminUsers || 0}
-                      </Typography>
-                    </Box>
-                    <AdminPanelSettings color="primary" sx={{ fontSize: 40 }} />
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h2" color="primary" sx={{ fontWeight: 'bold' }}>
+                      {dashboardStats?.adminUsers || 0}
+                    </Typography>
+                    <Typography color="textSecondary" variant="body1">
+                      Admin Users
+                    </Typography>
                   </Box>
                 </CardContent>
               </Card>
@@ -243,16 +237,13 @@ const AdminPanel: React.FC = () => {
             <Grid item xs={12} sm={6} md={3}>
               <Card>
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography color="textSecondary" gutterBottom variant="h6">
-                        Normal Users
-                      </Typography>
-                      <Typography variant="h4">
-                        {dashboardStats?.normalUsers || 0}
-                      </Typography>
-                    </Box>
-                    <PersonOutline color="primary" sx={{ fontSize: 40 }} />
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h2" color="success.main" sx={{ fontWeight: 'bold' }}>
+                      {dashboardStats?.normalUsers || 0}
+                    </Typography>
+                    <Typography color="textSecondary" variant="body1">
+                      Normal Users
+                    </Typography>
                   </Box>
                 </CardContent>
               </Card>
@@ -261,16 +252,13 @@ const AdminPanel: React.FC = () => {
             <Grid item xs={12} sm={6} md={3}>
               <Card>
                 <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Box>
-                      <Typography color="textSecondary" gutterBottom variant="h6">
-                        Active Users
-                      </Typography>
-                      <Typography variant="h4">
-                        {dashboardStats?.activeUsers || 0}
-                      </Typography>
-                    </Box>
-                    <CheckCircle color="primary" sx={{ fontSize: 40 }} />
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography variant="h2" color="warning.main" sx={{ fontWeight: 'bold' }}>
+                      {dashboardStats?.activeUsers || 0}
+                    </Typography>
+                    <Typography color="textSecondary" variant="body1">
+                      Active Users
+                    </Typography>
                   </Box>
                 </CardContent>
               </Card>
