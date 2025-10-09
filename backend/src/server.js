@@ -11,6 +11,7 @@ const batchRoutes = require('./routes/batchRoutes');
 const qcRoutes = require('./routes/qcRoutes');
 const supervisorRoutes = require('./routes/supervisorRoutes');
 const translationRoutes = require('./routes/translationRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5003;
@@ -46,6 +47,7 @@ app.use('/api/batches', batchRoutes);
 app.use('/api/qc', qcRoutes);
 app.use('/api/supervisor', supervisorRoutes);
 app.use('/api/translation', translationRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ 

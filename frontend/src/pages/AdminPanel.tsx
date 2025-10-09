@@ -37,6 +37,7 @@ import { authService } from '../services/authService';
 import UserManagement from '../components/UserManagement';
 import AssetTracking from '../components/AssetTracking';
 import BatchAssignment from '../components/BatchAssignment';
+import DataExport from '../components/DataExport';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -112,7 +113,7 @@ const AdminPanel: React.FC = () => {
   useEffect(() => {
     if (tabValue === 0) {
       fetchDashboardData();
-    } else if (tabValue === 4) {
+    } else if (tabValue === 5) {
       fetchResetFormData();
     }
   }, [tabValue]);
@@ -631,24 +632,29 @@ const AdminPanel: React.FC = () => {
               aria-controls="admin-tabpanel-1"
             />
             <Tab 
-              label="Progress" 
+              label="Asset Tracking" 
               id="admin-tab-2"
               aria-controls="admin-tabpanel-2"
             />
             <Tab 
-              label="Data Export" 
+              label="Progress" 
               id="admin-tab-3"
               aria-controls="admin-tabpanel-3"
             />
             <Tab 
-              label="Reset & Reassign" 
+              label="Data Export" 
               id="admin-tab-4"
               aria-controls="admin-tabpanel-4"
             />
             <Tab 
-              label="Batch Assignment" 
+              label="Reset & Reassign" 
               id="admin-tab-5"
               aria-controls="admin-tabpanel-5"
+            />
+            <Tab 
+              label="Batch Assignment" 
+              id="admin-tab-6"
+              aria-controls="admin-tabpanel-6"
             />
           </Tabs>
         </Box>
@@ -662,6 +668,10 @@ const AdminPanel: React.FC = () => {
         </TabPanel>
 
         <TabPanel value={tabValue} index={2}>
+          <AssetTracking />
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={3}>
           <Box sx={{ p: 3 }}>
             <Typography variant="h5" gutterBottom>
               Progress
@@ -672,21 +682,11 @@ const AdminPanel: React.FC = () => {
           </Box>
         </TabPanel>
 
-        <TabPanel value={tabValue} index={3}>
-          <Box sx={{ p: 3 }}>
-            <Typography variant="h5" gutterBottom>
-              Data Export
-            </Typography>
-            <Typography color="textSecondary" paragraph>
-              Export platform data and reports. This feature will be implemented soon.
-            </Typography>
-            <Button variant="outlined" startIcon={<GetApp />}>
-              Export Data
-            </Button>
-          </Box>
+        <TabPanel value={tabValue} index={4}>
+          <DataExport />
         </TabPanel>
 
-        <TabPanel value={tabValue} index={4}>
+        <TabPanel value={tabValue} index={5}>
           <Box sx={{ p: 3 }}>
             <Typography variant="body1" color="textSecondary" gutterBottom>
               Reset QC status for assets and reassign them to a new user based on user, region, and sub-category filters
@@ -844,7 +844,7 @@ const AdminPanel: React.FC = () => {
           </Box>
         </TabPanel>
 
-        <TabPanel value={tabValue} index={5}>
+        <TabPanel value={tabValue} index={6}>
           <BatchAssignment />
         </TabPanel>
       </Container>
