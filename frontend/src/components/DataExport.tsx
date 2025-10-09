@@ -36,11 +36,23 @@ interface ExportFilters {
   dateTo?: string;
 }
 
+interface FilterOptions {
+  locales: string[];
+  bookingCategories: string[];
+  deliverableTypes: string[];
+}
+
 const DataExport: React.FC = () => {
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [filters, setFilters] = useState<ExportFilters>({});
   const [exporting, setExporting] = useState(false);
   const [exportType, setExportType] = useState<'all' | 'filtered'>('all');
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
+    locales: [],
+    bookingCategories: [],
+    deliverableTypes: []
+  });
+  const [loadingFilterOptions, setLoadingFilterOptions] = useState(false);
 
   const handleExportAll = async () => {
     setExporting(true);
@@ -78,7 +90,34 @@ const DataExport: React.FC = () => {
     }
   };
 
+  const fetchFilterOptions = async () => {
+    setLoadingFilterOptions(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5003/api/admin/export/filter-options', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setFilterOptions(result.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching filter options:', error);
+    } finally {
+      setLoadingFilterOptions(false);
+    }
+  };
+
   const handleExportWithFilters = () => {
+    if (filterOptions.locales.length === 0) {
+      fetchFilterOptions();
+    }
     setFilterDialogOpen(true);
   };
 
@@ -267,11 +306,14 @@ const DataExport: React.FC = () => {
                   value={filters.locale || ''}
                   onChange={(e) => setFilters({ ...filters, locale: e.target.value })}
                   label="Locale"
+                  disabled={loadingFilterOptions}
                 >
                   <MenuItem value="">All Locales</MenuItem>
-                  <MenuItem value="en_US">English (US)</MenuItem>
-                  <MenuItem value="zh_HK">Chinese (HK)</MenuItem>
-                  <MenuItem value="nl_NL">Dutch (NL)</MenuItem>
+                  {filterOptions.locales.map((locale) => (
+                    <MenuItem key={locale} value={locale}>
+                      {locale}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             </Grid>
@@ -283,11 +325,14 @@ const DataExport: React.FC = () => {
                   value={filters.deliverableType || ''}
                   onChange={(e) => setFilters({ ...filters, deliverableType: e.target.value })}
                   label="Deliverable Type"
+                  disabled={loadingFilterOptions}
                 >
                   <MenuItem value="">All Types</MenuItem>
-                  <MenuItem value="Raw Email">Raw Email</MenuItem>
-                  <MenuItem value="Email + Attachment">Email + Attachment</MenuItem>
-                  <MenuItem value="Text Message">Text Message</MenuItem>
+                  {filterOptions.deliverableTypes.map((type) => (
+                    <MenuItem key={type} value={type}>
+                      {type}
+                    </MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             </Grid>
@@ -310,13 +355,22 @@ const DataExport: React.FC = () => {
             </Grid>
 
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Booking Category"
-                value={filters.bookingCategory || ''}
-                onChange={(e) => setFilters({ ...filters, bookingCategory: e.target.value })}
-                placeholder="e.g., Flight - Third-party provider"
-              />
+              <FormControl fullWidth>
+                <InputLabel>Booking Category</InputLabel>
+                <Select
+                  value={filters.bookingCategory || ''}
+                  onChange={(e) => setFilters({ ...filters, bookingCategory: e.target.value })}
+                  label="Booking Category"
+                  disabled={loadingFilterOptions}
+                >
+                  <MenuItem value="">All Categories</MenuItem>
+                  {filterOptions.bookingCategories.map((category) => (
+                    <MenuItem key={category} value={category}>
+                      {category}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
             </Grid>
 
             <Grid item xs={12} sm={6}>

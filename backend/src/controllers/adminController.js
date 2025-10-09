@@ -185,7 +185,86 @@ const getExportStats = async (req, res) => {
   }
 };
 
+// Get filter options for export
+const getExportFilterOptions = async (req, res) => {
+  try {
+    // Get unique locales
+    const localeQuery = `
+      SELECT DISTINCT JSON_EXTRACT(metadata, '$.locale') as locale 
+      FROM assets 
+      WHERE JSON_EXTRACT(metadata, '$.locale') IS NOT NULL 
+      AND JSON_EXTRACT(metadata, '$.locale') != ''
+      ORDER BY locale
+    `;
+
+    // Get unique booking categories
+    const categoryQuery = `
+      SELECT DISTINCT JSON_EXTRACT(metadata, '$.bookingCategory') as booking_category 
+      FROM assets 
+      WHERE JSON_EXTRACT(metadata, '$.bookingCategory') IS NOT NULL 
+      AND JSON_EXTRACT(metadata, '$.bookingCategory') != ''
+      ORDER BY booking_category
+    `;
+
+    // Get unique deliverable types
+    const deliverableQuery = `
+      SELECT DISTINCT deliverable_type 
+      FROM assets 
+      WHERE deliverable_type IS NOT NULL 
+      AND deliverable_type != ''
+      ORDER BY deliverable_type
+    `;
+
+    db.all(localeQuery, [], (err, locales) => {
+      if (err) {
+        console.error('Error fetching locales:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to fetch filter options'
+        });
+      }
+
+      db.all(categoryQuery, [], (err, categories) => {
+        if (err) {
+          console.error('Error fetching categories:', err);
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch filter options'
+          });
+        }
+
+        db.all(deliverableQuery, [], (err, deliverableTypes) => {
+          if (err) {
+            console.error('Error fetching deliverable types:', err);
+            return res.status(500).json({
+              success: false,
+              message: 'Failed to fetch filter options'
+            });
+          }
+
+          res.json({
+            success: true,
+            data: {
+              locales: locales.map(row => row.locale).filter(Boolean),
+              bookingCategories: categories.map(row => row.booking_category).filter(Boolean),
+              deliverableTypes: deliverableTypes.map(row => row.deliverable_type).filter(Boolean)
+            }
+          });
+        });
+      });
+    });
+
+  } catch (error) {
+    console.error('Error in getExportFilterOptions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
 module.exports = {
   exportQCResults,
-  getExportStats
+  getExportStats,
+  getExportFilterOptions
 };
