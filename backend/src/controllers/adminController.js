@@ -279,17 +279,18 @@ const getProgressStats = async (req, res) => {
     // Get overall statistics
     const statsQuery = `
       SELECT 
-        COUNT(*) as total_assets,
-        COUNT(CASE WHEN a.qc_status = 'approved' THEN 1 END) as completed,
+        COUNT(DISTINCT a.asset_id) as total_assets,
+        COUNT(DISTINCT CASE WHEN a.qc_status = 'approved' THEN a.asset_id END) as completed,
         ROUND(AVG(daily_completed.completed_per_day), 0) as average_per_day
       FROM assets a
       LEFT JOIN (
         SELECT 
-          DATE(created_date) as date,
-          COUNT(*) as completed_per_day
+          DATE(qc_completed_date) as date,
+          COUNT(DISTINCT asset_id) as completed_per_day
         FROM assets
         WHERE qc_status = 'approved'
-        GROUP BY DATE(created_date)
+        AND qc_completed_date IS NOT NULL
+        GROUP BY DATE(qc_completed_date)
       ) daily_completed ON 1=1
       WHERE 1=1 ${dateFilter}
     `;
@@ -338,9 +339,9 @@ const getLocaleProgress = async (req, res) => {
     const query = `
       SELECT 
         JSON_EXTRACT(metadata, '$.locale') as locale,
-        COUNT(*) as total,
-        COUNT(CASE WHEN qc_status = 'approved' THEN 1 END) as completed,
-        COUNT(CASE WHEN qc_status != 'approved' OR qc_status IS NULL THEN 1 END) as remaining
+        COUNT(DISTINCT asset_id) as total,
+        COUNT(DISTINCT CASE WHEN qc_status = 'approved' THEN asset_id END) as completed,
+        COUNT(DISTINCT CASE WHEN qc_status != 'approved' OR qc_status IS NULL THEN asset_id END) as remaining
       FROM assets a
       WHERE JSON_EXTRACT(metadata, '$.locale') IS NOT NULL 
       AND JSON_EXTRACT(metadata, '$.locale') != ''
@@ -397,7 +398,7 @@ const getDateProgress = async (req, res) => {
     const query = `
       SELECT 
         DATE(qc_completed_date) as date,
-        COUNT(*) as completed
+        COUNT(DISTINCT asset_id) as completed
       FROM assets
       ${dateFilter}
       AND qc_status = 'approved'
