@@ -79,12 +79,39 @@ const requirePermission = (permission) => {
   };
 };
 
+// Middleware to authenticate token from query params (for iframe/direct access)
+const authenticateTokenFromQuery = (req, res, next) => {
+  console.log('Auth from query middleware called for:', req.method, req.path);
+  
+  // Check query params first, then headers
+  const token = req.query.token || (req.headers['authorization'] && req.headers['authorization'].split(' ')[1]);
+  
+  console.log('Token source:', req.query.token ? 'Query param' : 'Header');
+  console.log('Token:', token ? 'Token present' : 'No token');
+  
+  if (!token) {
+    console.log('No token provided');
+    return res.status(401).json({ error: 'Access token required' });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) {
+      console.log('JWT verification failed:', err.message);
+      return res.status(403).json({ error: 'Invalid or expired token' });
+    }
+    console.log('JWT verification successful from query/header, user:', user);
+    req.user = user;
+    next();
+  });
+};
+
 const adminOnly = requireRole(['admin']);
 const supervisorOrAdmin = requireRole(['admin', 'supervisor']);
 const qcUserOrAbove = requireRole(['admin', 'supervisor', 'qc_user']);
 
 module.exports = {
   authenticateToken,
+  authenticateTokenFromQuery,
   requireRole,
   requirePermission,
   adminOnly,

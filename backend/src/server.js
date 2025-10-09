@@ -10,6 +10,7 @@ const assetRoutes = require('./routes/assetRoutes');
 const batchRoutes = require('./routes/batchRoutes');
 const qcRoutes = require('./routes/qcRoutes');
 const supervisorRoutes = require('./routes/supervisorRoutes');
+const translationRoutes = require('./routes/translationRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5003;
@@ -24,10 +25,13 @@ app.use(cors({
   credentials: true
 }));
 
-// Add security headers
+// Add security headers (disabled in development to avoid warnings)
 app.use((req, res, next) => {
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  // Only set these headers in production with HTTPS
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  }
   next();
 });
 
@@ -41,6 +45,7 @@ app.use('/api', assetRoutes);
 app.use('/api/batches', batchRoutes);
 app.use('/api/qc', qcRoutes);
 app.use('/api/supervisor', supervisorRoutes);
+app.use('/api/translation', translationRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ 

@@ -1,5 +1,6 @@
 const { db } = require('../models/database');
 const AWS = require('aws-sdk');
+const pdfParse = require('pdf-parse');
 
 // Configure AWS
 const s3 = new AWS.S3({
@@ -166,7 +167,7 @@ const getFileContent = async (req, res) => {
         return res.status(500).json({ error: 'Failed to fetch file' });
       }
 
-      // Set appropriate content type
+      // Set appropriate content type and headers
       const fileExtension = s3Key.split('.').pop().toLowerCase();
       let contentType = 'text/plain';
       
@@ -174,6 +175,10 @@ const getFileContent = async (req, res) => {
         contentType = 'message/rfc822';
       } else if (fileExtension === 'pdf') {
         contentType = 'application/pdf';
+        // Add headers to allow PDF display inline
+        res.set('Content-Disposition', 'inline; filename="' + s3Key.split('/').pop() + '"');
+        // Remove X-Frame-Options to allow embedding
+        res.removeHeader('X-Frame-Options');
       }
 
       res.set('Content-Type', contentType);
@@ -322,6 +327,42 @@ const submitQCReview = async (req, res) => {
   }
 };
 
+// Extract text from PDF file
+const extractPdfText = async (req, res) => {
+  try {
+    const { s3Key } = req.params;
+
+    const params = {
+      Bucket: process.env.S3_BUCKET_NAME,
+      Key: s3Key
+    };
+
+    s3.getObject(params, async (err, data) => {
+      if (err) {
+        console.error('Error fetching PDF from S3:', err);
+        return res.status(500).json({ error: 'Failed to fetch PDF file' });
+      }
+
+      try {
+        // Extract text from PDF buffer
+        const pdfData = await pdfParse(data.Body);
+        
+        res.json({ 
+          text: pdfData.text,
+          pages: pdfData.numpages,
+          info: pdfData.info
+        });
+      } catch (parseError) {
+        console.error('Error parsing PDF:', parseError);
+        res.status(500).json({ error: 'Failed to extract text from PDF' });
+      }
+    });
+  } catch (error) {
+    console.error('Error extracting PDF text:', error);
+    res.status(500).json({ error: 'Failed to extract PDF text' });
+  }
+};
+
 // Get QC statistics
 const getQCStats = async (req, res) => {
   try {
@@ -359,5 +400,6 @@ module.exports = {
   getFileContent,
   getFileUrl,
   submitQCReview,
-  getQCStats
+  getQCStats,
+  extractPdfText
 };

@@ -359,8 +359,48 @@ const uploadFiles = async (req, res) => {
 
                   pendingInserts--;
                   if (pendingInserts === 0 && !hasError) {
-                    db.run('COMMIT');
-                    resolve();
+                    // Check for existing batch assignments and auto-assign
+                    const batchId = `${metadataObj.locale}_${metadataObj.bookingCategory.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+                    
+                    db.get(
+                      'SELECT user_id FROM batch_assignments WHERE batch_id = ?',
+                      [batchId],
+                      (err, assignment) => {
+                        if (err) {
+                          console.error('Error checking batch assignment:', err);
+                          db.run('COMMIT');
+                          return resolve();
+                        }
+                        
+                        if (assignment) {
+                          // Update asset with batch assignment
+                          db.run(
+                            'UPDATE assets SET batch_id = ?, assigned_to = ? WHERE asset_id = ?',
+                            [batchId, assignment.user_id, assetId],
+                            (err) => {
+                              if (err) {
+                                console.error('Error assigning asset to batch:', err);
+                              } else {
+                                // Update batch assignment count
+                                db.run(
+                                  'UPDATE batch_assignments SET assigned_assets = assigned_assets + 1 WHERE batch_id = ? AND user_id = ?',
+                                  [batchId, assignment.user_id],
+                                  (err) => {
+                                    if (err) console.error('Error updating batch count:', err);
+                                  }
+                                );
+                                console.log(`Auto-assigned asset ${assetId} to batch ${batchId} (user ${assignment.user_id})`);
+                              }
+                              db.run('COMMIT');
+                              resolve();
+                            }
+                          );
+                        } else {
+                          db.run('COMMIT');
+                          resolve();
+                        }
+                      }
+                    );
                   }
                 }
               );

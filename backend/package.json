@@ -11,6 +11,7 @@
     "generate-secret": "node src/utils/generateSecret.js"
   },
   "dependencies": {
+    "@google-cloud/translate": "^9.2.0",
     "aws-sdk": "^2.1692.0",
     "axios": "^1.12.2",
     "bcrypt": "^5.1.1",
@@ -21,6 +22,7 @@
     "google-auth-library": "^9.2.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
+    "pdf-parse": "^2.2.2",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
