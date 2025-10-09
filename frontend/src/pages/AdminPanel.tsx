@@ -127,22 +127,25 @@ const AdminPanel: React.FC = () => {
           if (asset.metadata) {
             try {
               const metadata = typeof asset.metadata === 'string' ? JSON.parse(asset.metadata) : asset.metadata;
-              const locale = metadata.locale || 'Unknown';
+              const locale = metadata.locale;
               
-              if (!localeMap.has(locale)) {
-                localeMap.set(locale, { completed: 0, total: 0 });
-              }
-              
-              const localeData = localeMap.get(locale)!;
-              localeData.total++;
-              totalAssets++;
-              
-              if (asset.qc_status === 'approved') {
-                localeData.completed++;
-                totalCompleted++;
+              // Only include assets with valid locale data
+              if (locale && locale !== 'Unknown' && locale.trim() !== '') {
+                if (!localeMap.has(locale)) {
+                  localeMap.set(locale, { completed: 0, total: 0 });
+                }
+                
+                const localeData = localeMap.get(locale)!;
+                localeData.total++;
+                totalAssets++;
+                
+                if (asset.qc_status === 'approved') {
+                  localeData.completed++;
+                  totalCompleted++;
+                }
               }
             } catch (e) {
-              // Handle invalid JSON
+              // Handle invalid JSON - skip these assets
             }
           }
         });
