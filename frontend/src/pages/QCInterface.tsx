@@ -227,15 +227,32 @@ const QCInterface: React.FC = () => {
   const loadFileContent = async (file: AssetFile) => {
     try {
       const token = localStorage.getItem('token');
+      let content = '';
       
-      const response = await fetch(`${API_BASE}/api/qc/file/${encodeURIComponent(file.s3_key)}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
+      if (file.file_type.toLowerCase() === 'pdf') {
+        // Extract text from PDF using the new endpoint
+        const response = await fetch(`${API_BASE}/api/qc/pdf-text/${encodeURIComponent(file.s3_key)}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          const pdfData = await response.json();
+          content = pdfData.text;
         }
-      });
-
-      if (response.ok) {
-        const content = await response.text();
+      } else {
+        // Load content directly for non-PDF files
+        const response = await fetch(`${API_BASE}/api/qc/file/${encodeURIComponent(file.s3_key)}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          content = await response.text();
+        }
+      }
+      
+      if (content) {
         setFileContents(prev => ({
           ...prev,
           [file.s3_key]: content
@@ -272,14 +289,45 @@ const QCInterface: React.FC = () => {
 
   const handleTranslate = async (fileKey: string, content: string) => {
     try {
-      // Mock translation - in real implementation, call translation service
-      const mockTranslation = `[TRANSLATED] ${content}`;
-      setTranslatedContent(prev => ({
-        ...prev,
-        [fileKey]: mockTranslation
-      }));
+      const token = localStorage.getItem('token');
+      
+      // Call the real translation API
+      const response = await fetch(`${API_BASE}/api/translation/translate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          text: content,
+          targetLanguage: 'en', // Default to English, can be made configurable
+          sourceLanguage: 'auto' // Auto-detect source language
+        })
+      });
+
+      if (response.ok) {
+        const translationResult = await response.json();
+        setTranslatedContent(prev => ({
+          ...prev,
+          [fileKey]: translationResult.translatedText
+        }));
+        
+        // Show success message with detected language
+        setSnackbar({
+          open: true,
+          message: `Translated from ${translationResult.sourceLanguage} to ${translationResult.targetLanguage}`,
+          severity: 'success'
+        });
+      } else {
+        throw new Error('Translation failed');
+      }
     } catch (error) {
       console.error('Error translating content:', error);
+      setSnackbar({
+        open: true,
+        message: 'Translation failed. Please try again.',
+        severity: 'error'
+      });
     }
   };
 
@@ -410,14 +458,49 @@ const QCInterface: React.FC = () => {
         </Box>
 
         {file.file_type.toLowerCase() === 'pdf' ? (
-          <Box sx={{ height: 600, border: '1px solid #ccc' }}>
-            <iframe
-              src={`${API_BASE}/api/qc/file/${encodeURIComponent(file.s3_key)}?token=${localStorage.getItem('token')}`}
-              width="100%"
-              height="100%"
-              title={file.filename}
-            />
-          </Box>
+          <Stack spacing={3}>
+            {/* PDF Viewer */}
+            <Box>
+              <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                PDF Document
+              </Typography>
+              <Box sx={{ height: 400, border: '1px solid #ccc', overflow: 'hidden' }}>
+                <object
+                  data={`${API_BASE}/api/qc/file/${encodeURIComponent(file.s3_key)}?token=${localStorage.getItem('token')}`}
+                  type="application/pdf"
+                  width="100%"
+                  height="100%"
+                  aria-label={file.filename}
+                >
+                  <embed
+                    src={`${API_BASE}/api/qc/file/${encodeURIComponent(file.s3_key)}?token=${localStorage.getItem('token')}`}
+                    type="application/pdf"
+                    width="100%"
+                    height="100%"
+                  />
+                  <p>Your browser does not support PDFs. 
+                    <a href={`${API_BASE}/api/qc/file/${encodeURIComponent(file.s3_key)}?token=${localStorage.getItem('token')}`}>
+                      Download the PDF
+                    </a>
+                  </p>
+                </object>
+              </Box>
+            </Box>
+
+            {/* Translation */}
+            {translation && (
+              <Box>
+                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                  Translation
+                </Typography>
+                <Paper sx={{ p: 2, maxHeight: 300, overflow: 'auto', bgcolor: 'lightblue', opacity: 0.8 }}>
+                  <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {translation}
+                  </Typography>
+                </Paper>
+              </Box>
+            )}
+          </Stack>
         ) : (
           <Stack spacing={3}>
             {/* Original Content */}

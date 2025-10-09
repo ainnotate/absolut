@@ -1,277 +1,410 @@
 import React, { useState, useEffect } from 'react';
 import {
   Container,
+  Paper,
   Typography,
   AppBar,
   Toolbar,
+  IconButton,
   Button,
+  Grid,
   Box,
   Card,
   CardContent,
-  Grid,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemSecondaryAction,
-  IconButton,
-  Chip,
-  Alert,
-  CircularProgress,
-  Tabs,
-  Tab,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Paper,
+  Chip,
+  Pagination,
+  CircularProgress,
+  Alert,
+  Stack,
+  TextField,
+  InputAdornment,
+  Collapse,
+  Autocomplete,
+  Tabs,
+  Tab,
+  Tooltip,
+  List,
+  ListItem,
+  ListItemText,
   Avatar,
   LinearProgress
 } from '@mui/material';
 import {
   Logout,
+  Visibility,
+  Search,
+  Clear,
+  Assignment,
+  ContactSupport,
   PlayArrow,
-  SupervisorAccount,
+  Dashboard,
   CheckCircle,
   Cancel,
-  ContactSupport,
-  Assessment,
+  HourglassEmpty,
+  SupervisorAccount,
   People,
-  TrendingUp,
-  Warning
+  Assessment
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { authService } from '../services/authService';
 
-interface SupervisorStats {
-  total_for_review: number;
-  pending_review: number;
-  approved: number;
-  rejected: number;
-  consulted: number;
-  myReviews?: {
-    my_reviews: number;
-    my_approved: number;
-    my_rejected: number;
-    my_consulted: number;
-  };
-}
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5003/api';
 
-interface QCPerformance {
-  id: number;
-  username: string;
-  email: string;
-  total_reviewed: number;
-  approved: number;
-  rejected: number;
-  sent_to_supervisor: number;
-  supervisor_approved: number;
-  supervisor_rejected: number;
-}
-
-interface AssetForReview {
-  id: number;
+interface SupervisorAsset {
   asset_id: string;
+  user_id: number;
   deliverable_type: string;
-  uploader_username: string;
-  qc_username: string;
-  qc_completed_date: string;
   metadata: any;
-  files: any[];
+  created_date: string;
+  batch_id?: string;
+  assigned_to?: number;
+  qc_status?: string;
+  qc_completed_date?: string;
+  qc_comments?: string;
+  username?: string;
+  qc_username?: string;
+  qc_email?: string;
+  uploader_name?: string;
 }
 
-const API_BASE = 'http://192.168.29.158:5003';
+interface Statistics {
+  total_assets: number;
+  pending_qc: number;
+  completed_qc: number;
+  approved: number;
+  rejected: number;
+  review_requested: number;
+}
 
 const SupervisorDashboard: React.FC = () => {
   const navigate = useNavigate();
-  const [stats, setStats] = useState<SupervisorStats | null>(null);
-  const [qcPerformance, setQCPerformance] = useState<QCPerformance[]>([]);
-  const [assetsForReview, setAssetsForReview] = useState<AssetForReview[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState(0);
-  const currentUser = authService.getUser();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  const [currentTab, setCurrentTab] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [assets, setAssets] = useState<SupervisorAsset[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [statistics, setStatistics] = useState<Statistics | null>(null);
+  const [error, setError] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // Filter states
+  const [showFilters, setShowFilters] = useState(true);
+  const [selectedQCStatus, setSelectedQCStatus] = useState<string>('');
+  const [selectedQCUser, setSelectedQCUser] = useState<string>('');
+  const [selectedDeliverableType, setSelectedDeliverableType] = useState<string>('');
+
+  // Filter options
+  const qcStatusOptions = ['pending', 'approved', 'rejected'];
+  const [qcUsers, setQCUsers] = useState<Array<{id: number, username: string}>>([]);
+  const [deliverableTypes, setDeliverableTypes] = useState<string[]>([]);
+  const [hasActiveList, setHasActiveList] = useState(false);
 
   useEffect(() => {
-    fetchSupervisorData();
+    loadCurrentUser();
+    loadStatistics();
+    loadFilterOptions();
+    // Check if there's an active sequential review list on mount
+    setHasActiveList(sessionStorage.getItem('supervisorAssetList') !== null);
   }, []);
 
-  const fetchSupervisorData = async () => {
+  useEffect(() => {
+    loadAssets();
+  }, [currentPage, searchQuery, selectedQCStatus, selectedQCUser, selectedDeliverableType, currentTab]);
+
+  const loadCurrentUser = () => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setCurrentUser(payload);
+      } catch (error) {
+        console.error('Error parsing token:', error);
+        navigate('/login');
+      }
+    } else {
+      navigate('/login');
+    }
+  };
+
+  const loadStatistics = async () => {
     try {
-      setLoading(true);
       const token = localStorage.getItem('token');
-
-      // Fetch supervisor statistics
-      const statsResponse = await fetch(`${API_BASE}/api/supervisor/stats`, {
+      const response = await fetch(`${API_URL}/supervisor/statistics`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json();
-        setStats(statsData.stats);
-      }
-
-      // Fetch QC performance
-      const performanceResponse = await fetch(`${API_BASE}/api/supervisor/qc-performance`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (performanceResponse.ok) {
-        const performanceData = await performanceResponse.json();
-        setQCPerformance(performanceData.performance || []);
-      }
-
-      // Fetch assets for review
-      const reviewResponse = await fetch(`${API_BASE}/api/supervisor/review-queue?status=pending`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (reviewResponse.ok) {
-        const reviewData = await reviewResponse.json();
-        setAssetsForReview(reviewData.assets || []);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setStatistics(data.statistics);
       }
     } catch (error) {
-      console.error('Error fetching supervisor data:', error);
+      console.error('Error loading statistics:', error);
+    }
+  };
+
+  const loadAssets = async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const token = localStorage.getItem('token');
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: '20',
+      });
+
+      if (searchQuery) params.append('search', searchQuery);
+      if (selectedQCStatus) params.append('qc_status', selectedQCStatus);
+      if (selectedQCUser) params.append('qc_user', selectedQCUser);
+      if (selectedDeliverableType) params.append('deliverable_type', selectedDeliverableType);
+
+      // For Review Requested tab, show assets that requested supervisor review
+      if (currentTab === 1) {
+        params.set('supervisor_review_requested', 'true');
+      }
+
+      const response = await fetch(`${API_URL}/supervisor/assets?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAssets(data.assets);
+        setTotalPages(data.totalPages);
+        setTotalCount(data.totalCount);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to load assets');
+        setAssets([]);
+      }
+    } catch (error: any) {
+      setError('Failed to load assets');
+      setAssets([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    authService.logout();
-    window.location.href = '/';
+  const loadFilterOptions = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/supervisor/filter-options`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setQCUsers(data.qcUsers);
+        setDeliverableTypes(data.deliverableTypes);
+      }
+    } catch (error) {
+      console.error('Failed to load filter options:', error);
+    }
   };
 
-  const handleStartReview = () => {
-    navigate('/supervisor/review');
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setCurrentTab(newValue);
+    setCurrentPage(1);
   };
 
-  const calculateAccuracy = (performance: QCPerformance) => {
-    if (performance.sent_to_supervisor === 0) return 100;
-    const correct = performance.supervisor_approved;
-    const total = performance.supervisor_approved + performance.supervisor_rejected;
-    return total > 0 ? Math.round((correct / total) * 100) : 0;
+  const handleLogout = async () => {
+    localStorage.removeItem('token');
+    navigate('/login');
   };
 
-  const getPerformanceColor = (accuracy: number): 'primary' | 'secondary' | 'success' | 'info' | 'warning' | 'error' => {
-    if (accuracy >= 90) return 'success';
-    if (accuracy >= 70) return 'warning';
-    return 'error';
+  const handlePageChange = (event: React.ChangeEvent<unknown>, page: number) => {
+    setCurrentPage(page);
   };
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const handleReviewAsset = (assetId: string) => {
+    // Store the current filtered asset list in sessionStorage for sequential review
+    const assetList = assets.map(a => a.asset_id);
+    const currentIndex = assetList.indexOf(assetId);
+
+    sessionStorage.setItem('supervisorAssetList', JSON.stringify(assetList));
+    sessionStorage.setItem('supervisorAssetIndex', currentIndex.toString());
+    sessionStorage.setItem('supervisorFilterState', JSON.stringify({
+      selectedQCStatus,
+      selectedQCUser,
+      selectedDeliverableType,
+      searchQuery,
+      currentTab,
+    }));
+
+    navigate(`/supervisor/review/${assetId}`);
+  };
+
+  const handleStartSequentialReview = () => {
+    if (assets.length === 0) return;
+
+    // Store the current filtered asset list in sessionStorage for sequential review
+    const assetList = assets.map(a => a.asset_id);
+
+    sessionStorage.setItem('supervisorAssetList', JSON.stringify(assetList));
+    sessionStorage.setItem('supervisorAssetIndex', '0');
+    sessionStorage.setItem('supervisorFilterState', JSON.stringify({
+      selectedQCStatus,
+      selectedQCUser,
+      selectedDeliverableType,
+      searchQuery,
+      currentTab,
+    }));
+
+    setHasActiveList(true);
+
+    // Navigate to the first asset
+    navigate(`/supervisor/review/${assetList[0]}`);
+  };
+
+
+  const handleSearch = () => {
+    setCurrentPage(1);
+    loadAssets();
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setCurrentPage(1);
+  };
+
+  const handleSearchKeyPress = (event: React.KeyboardEvent) => {
+    if (event.key === 'Enter') {
+      handleSearch();
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return 'success';
+      case 'rejected':
+        return 'error';
+      // Remove needs_revision case
+      case 'pending':
+        return 'default';
+      default:
+        return 'default';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return <CheckCircle fontSize="small" />;
+      case 'rejected':
+        return <Cancel fontSize="small" />;
+      // Remove needs_revision case
+      case 'pending':
+        return <HourglassEmpty fontSize="small" />;
+      default:
+        return <HourglassEmpty fontSize="small" />;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const parseMetadata = (metadata: string) => {
+    try {
+      return JSON.parse(metadata);
+    } catch {
+      return {};
+    }
+  };
 
   return (
-    <Box sx={{ flexGrow: 1 }}>
-      <AppBar position="static">
-        <Toolbar>
-          <SupervisorAccount sx={{ mr: 2 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Supervisor Dashboard - Absolute Platform
-          </Typography>
-          <Typography variant="body2" sx={{ mr: 2 }}>
-            {currentUser?.first_name || currentUser?.username} (Supervisor)
-          </Typography>
-          <Button color="inherit" onClick={handleLogout} startIcon={<Logout />}>
-            Logout
-          </Button>
-        </Toolbar>
-      </AppBar>
-
-      <Container maxWidth="xl" sx={{ mt: 2 }}>
-        {/* Welcome Section */}
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h4" gutterBottom>
-            Welcome, {currentUser?.first_name || currentUser?.username}!
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Supervisor Dashboard - Review QC decisions and monitor team performance
-          </Typography>
-        </Box>
+    <Box sx={{ width: '100%', minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
+      <Container maxWidth={false} sx={{ px: 2, py: 1 }}>
+        <AppBar position="static" sx={{ mb: 2, borderRadius: 1 }}>
+          <Toolbar>
+            <Dashboard sx={{ mr: 2 }} />
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+              Supervisor Dashboard - Absolute Platform
+            </Typography>
+            <Typography variant="body2" sx={{ mr: 2 }}>
+              {currentUser?.username} (Supervisor)
+            </Typography>
+            <IconButton color="inherit" onClick={handleLogout}>
+              <Logout />
+            </IconButton>
+          </Toolbar>
+        </AppBar>
 
         {/* Statistics Cards */}
-        {stats && (
-          <Grid container spacing={3} sx={{ mb: 4 }}>
-            <Grid item xs={12} sm={6} md={2}>
+        {statistics && (
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={12} sm={6} md={2.4}>
               <Card>
                 <CardContent>
+                  <Typography color="textSecondary" gutterBottom>
+                    Total Assets
+                  </Typography>
+                  <Typography variant="h4">
+                    {statistics.total_assets}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2.4}>
+              <Card>
+                <CardContent>
+                  <Typography color="textSecondary" gutterBottom>
+                    Pending QC
+                  </Typography>
                   <Typography variant="h4" color="warning.main">
-                    {stats.pending_review}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Pending Review
+                    {statistics.pending_qc}
                   </Typography>
                 </CardContent>
               </Card>
             </Grid>
-            <Grid item xs={12} sm={6} md={2}>
+            <Grid item xs={12} sm={6} md={2.4}>
               <Card>
                 <CardContent>
-                  <Typography variant="h4" color="primary">
-                    {stats.total_for_review}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Total For Review
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h4" color="success.main">
-                    {stats.approved}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography color="textSecondary" gutterBottom>
                     Approved
                   </Typography>
+                  <Typography variant="h4" color="success.main">
+                    {statistics.approved}
+                  </Typography>
                 </CardContent>
               </Card>
             </Grid>
-            <Grid item xs={12} sm={6} md={2}>
+            <Grid item xs={12} sm={6} md={2.4}>
               <Card>
                 <CardContent>
-                  <Typography variant="h4" color="error.main">
-                    {stats.rejected}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography color="textSecondary" gutterBottom>
                     Rejected
                   </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid item xs={12} sm={6} md={2}>
-              <Card>
-                <CardContent>
-                  <Typography variant="h4" color="info.main">
-                    {stats.consulted}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    Consulted
+                  <Typography variant="h4" color="error.main">
+                    {statistics.rejected}
                   </Typography>
                 </CardContent>
               </Card>
             </Grid>
-            <Grid item xs={12} sm={6} md={2}>
+            <Grid item xs={12} sm={6} md={2.4}>
               <Card>
                 <CardContent>
-                  <Typography variant="h4" color="secondary.main">
-                    {stats.myReviews?.my_reviews || 0}
+                  <Typography color="textSecondary" gutterBottom>
+                    Rejected
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    My Reviews
+                  <Typography variant="h4" color="error.main">
+                    {statistics.rejected}
                   </Typography>
                 </CardContent>
               </Card>
@@ -279,186 +412,255 @@ const SupervisorDashboard: React.FC = () => {
           </Grid>
         )}
 
-        {/* Review Queue */}
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h5">
-                <Assessment sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Review Queue
-              </Typography>
-              <Button
-                variant="contained"
-                startIcon={<PlayArrow />}
-                onClick={handleStartReview}
-                disabled={!stats || stats.pending_review === 0}
-              >
-                Start Reviewing
-              </Button>
-            </Box>
-            
-            {assetsForReview.length === 0 ? (
-              <Alert severity="info">
-                No assets pending supervisor review at this time.
-              </Alert>
-            ) : (
-              <Box>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  {assetsForReview.length} assets awaiting your review
-                </Typography>
-                <List>
-                  {assetsForReview.slice(0, 5).map((asset) => (
-                    <ListItem key={asset.id} divider>
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="subtitle1">
-                              {asset.asset_id}
-                            </Typography>
-                            <Chip label={asset.deliverable_type} size="small" />
-                          </Box>
-                        }
-                        secondary={
-                          <Typography variant="body2" color="text.secondary">
-                            Uploaded by: {asset.uploader_username} | 
-                            Reviewed by: {asset.qc_username} | 
-                            QC Date: {new Date(asset.qc_completed_date).toLocaleDateString()}
-                          </Typography>
-                        }
-                      />
-                    </ListItem>
-                  ))}
-                </List>
-                {assetsForReview.length > 5 && (
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
-                    And {assetsForReview.length - 5} more...
-                  </Typography>
-                )}
-              </Box>
-            )}
-          </CardContent>
-        </Card>
+        {/* Tab Navigation */}
+        <Paper sx={{ width: '100%', mb: 2 }}>
+          <Tabs value={currentTab} onChange={handleTabChange}>
+            <Tab icon={<Assignment />} label="All Assets" iconPosition="start" />
+            <Tab
+              icon={<ContactSupport />}
+              label={
+<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <span>Review Requested</span>
+                  {(statistics?.review_requested || 0) > 0 && (
+                    <Chip
+                      label={statistics?.review_requested || 0}
+                      size="small"
+                      color="info"
+                      sx={{
+                        height: '20px',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold'
+                      }}
+                    />
+                  )}
+                </Box>
+              }
+              iconPosition="start"
+            />
+          </Tabs>
+        </Paper>
 
-        {/* Performance Monitoring */}
-        <Card>
-          <CardContent>
-            <Typography variant="h5" gutterBottom>
-              <People sx={{ mr: 1, verticalAlign: 'middle' }} />
-              QC Team Performance
-            </Typography>
-            
-            <TableContainer component={Paper} sx={{ mt: 2 }}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell><strong>QC User</strong></TableCell>
-                    <TableCell align="center"><strong>Total Reviewed</strong></TableCell>
-                    <TableCell align="center"><strong>Approved</strong></TableCell>
-                    <TableCell align="center"><strong>Rejected</strong></TableCell>
-                    <TableCell align="center"><strong>Sent to Supervisor</strong></TableCell>
-                    <TableCell align="center"><strong>Supervisor Approved</strong></TableCell>
-                    <TableCell align="center"><strong>Accuracy</strong></TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {qcPerformance.map((performance) => {
-                    const accuracy = calculateAccuracy(performance);
-                    return (
-                      <TableRow key={performance.id}>
+        {/* Main Content */}
+        <Paper sx={{ width: '100%', mb: 2, p: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <TextField
+              size="small"
+              placeholder="Search by Asset ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={handleSearchKeyPress}
+              sx={{ minWidth: 250 }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search />
+                  </InputAdornment>
+                ),
+                endAdornment: searchQuery && (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="clear search"
+                      onClick={handleClearSearch}
+                      edge="end"
+                      size="small"
+                    >
+                      <Clear />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <Button
+              variant="outlined"
+              onClick={loadAssets}
+              disabled={loading}
+            >
+              Refresh
+            </Button>
+          </Box>
+
+          {/* Filter Panel */}
+          {currentTab === 0 && (
+            <Collapse in={showFilters}>
+              <Paper sx={{ p: 2, backgroundColor: '#f5f5f5', mb: 2 }}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Autocomplete
+                      size="small"
+                      options={qcUsers}
+                      getOptionLabel={(option) => option.username}
+                      value={qcUsers.find(u => u.id.toString() === selectedQCUser) || null}
+                      onChange={(event, newValue) => {
+                        setSelectedQCUser(newValue ? newValue.id.toString() : '');
+                        setCurrentPage(1);
+                      }}
+                      renderInput={(params) => (
+                        <TextField {...params} label="QC User" placeholder="All Users" />
+                      )}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Autocomplete
+                      size="small"
+                      options={deliverableTypes}
+                      value={selectedDeliverableType || null}
+                      onChange={(event, newValue) => {
+                        setSelectedDeliverableType(newValue || '');
+                        setCurrentPage(1);
+                      }}
+                      renderInput={(params) => (
+                        <TextField {...params} label="Deliverable Type" placeholder="All Types" />
+                      )}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Autocomplete
+                      size="small"
+                      options={qcStatusOptions}
+                      value={selectedQCStatus || null}
+                      onChange={(event, newValue) => {
+                        setSelectedQCStatus(newValue || '');
+                        setCurrentPage(1);
+                      }}
+                      getOptionLabel={(option) => {
+                        const labels: Record<string, string> = {
+                          'pending': 'Pending Review',
+                          'approved': 'QC Approved',
+                          'rejected': 'QC Rejected'
+                        };
+                        return labels[option] || option;
+                      }}
+                      renderInput={(params) => (
+                        <TextField {...params} label="QC Status" placeholder="All Statuses" />
+                      )}
+                    />
+                  </Grid>
+
+                  <Grid item xs={12} sm={6} md={3}>
+                    <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center" sx={{ height: '100%' }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => {
+                          setSelectedQCUser('');
+                          setSelectedDeliverableType('');
+                          setSelectedQCStatus('');
+                          setCurrentPage(1);
+                        }}
+                      >
+                        Clear Filters
+                      </Button>
+                    </Stack>
+                  </Grid>
+
+                  <Grid item xs={12}>
+                    <Stack direction="row" spacing={2} justifyContent="flex-end" alignItems="center">
+                      <Tooltip title="Review the list one by one">
+                        <Button
+                          variant="contained"
+                          size="small"
+                          color="primary"
+                          startIcon={<PlayArrow />}
+                          onClick={handleStartSequentialReview}
+                          disabled={assets.length === 0}
+                        >
+                          Start Review
+                        </Button>
+                      </Tooltip>
+                    </Stack>
+                  </Grid>
+                </Grid>
+              </Paper>
+            </Collapse>
+          )}
+
+          {/* Error Display */}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          )}
+
+          {/* Loading */}
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : assets.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography variant="body1" color="text.secondary">
+                {currentTab === 1 ? 'No consulted assets found.' : 'No assets found.'}
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <TableContainer>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Asset ID</TableCell>
+                      <TableCell>Locale</TableCell>
+                      <TableCell>Deliverable Type</TableCell>
+                      <TableCell>Uploader</TableCell>
+                      <TableCell>QC User</TableCell>
+                      <TableCell>QC Status</TableCell>
+                      <TableCell>QC Date</TableCell>
+                      <TableCell>Created Date</TableCell>
+                      <TableCell>Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {assets.map((asset) => (
+                      <TableRow key={asset.asset_id} hover>
                         <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Avatar sx={{ mr: 2 }}>
-                              {performance.username.charAt(0).toUpperCase()}
-                            </Avatar>
-                            <Box>
-                              <Typography variant="body2">{performance.username}</Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {performance.email}
-                              </Typography>
-                            </Box>
-                          </Box>
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                            {asset.asset_id}
+                          </Typography>
                         </TableCell>
-                        <TableCell align="center">{performance.total_reviewed}</TableCell>
-                        <TableCell align="center">
-                          <Chip 
-                            label={performance.approved} 
-                            color="success" 
-                            size="small" 
+                        <TableCell>{parseMetadata(asset.metadata)?.locale || '-'}</TableCell>
+                        <TableCell>{asset.deliverable_type}</TableCell>
+                        <TableCell>{asset.uploader_name || asset.username || '-'}</TableCell>
+                        <TableCell>{asset.qc_username || '-'}</TableCell>
+                        <TableCell>
+                          <Chip
+                            icon={getStatusIcon(asset.qc_status || 'pending')}
+                            label={asset.qc_status || 'Pending'}
+                            color={getStatusColor(asset.qc_status || 'pending') as any}
+                            size="small"
                           />
                         </TableCell>
-                        <TableCell align="center">
-                          <Chip 
-                            label={performance.rejected} 
-                            color="error" 
-                            size="small" 
-                          />
-                        </TableCell>
-                        <TableCell align="center">{performance.sent_to_supervisor}</TableCell>
-                        <TableCell align="center">{performance.supervisor_approved}</TableCell>
-                        <TableCell align="center">
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Box sx={{ width: '100%', mr: 1 }}>
-                              <LinearProgress 
-                                variant="determinate" 
-                                value={accuracy}
-                                color={getPerformanceColor(accuracy)}
-                              />
-                            </Box>
-                            <Typography 
-                              variant="body2" 
-                              color={getPerformanceColor(accuracy) + '.main'}
-                            >
-                              {accuracy}%
-                            </Typography>
-                          </Box>
+                        <TableCell>{formatDate(asset.qc_completed_date || '')}</TableCell>
+                        <TableCell>{formatDate(asset.created_date)}</TableCell>
+                        <TableCell>
+                          <Button
+                            startIcon={<Visibility />}
+                            size="small"
+                            onClick={() => handleReviewAsset(asset.asset_id)}
+                          >
+                            Review
+                          </Button>
                         </TableCell>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
 
-            {qcPerformance.length === 0 && (
-              <Alert severity="info" sx={{ mt: 2 }}>
-                No QC performance data available yet.
-              </Alert>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Quick Actions */}
-        <Card sx={{ mt: 3 }}>
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Quick Actions & Guidelines
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <Typography variant="body2" paragraph>
-                  <strong>1. Review Priority:</strong> Focus on assets flagged by QC users for consultation first.
-                </Typography>
-                <Typography variant="body2" paragraph>
-                  <strong>2. Quality Standards:</strong> Ensure metadata accuracy and file quality meet platform standards.
-                </Typography>
-                <Typography variant="body2" paragraph>
-                  <strong>3. Feedback:</strong> Provide clear, constructive feedback to help QC users improve.
-                </Typography>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography variant="body2" paragraph>
-                  <strong>4. Performance Monitoring:</strong> Regularly check team accuracy rates and provide guidance.
-                </Typography>
-                <Typography variant="body2" paragraph>
-                  <strong>5. Escalation:</strong> Flag complex issues or policy questions for administrative review.
-                </Typography>
-                <Typography variant="body2" paragraph>
-                  <strong>6. Documentation:</strong> Keep detailed notes for training and quality improvement purposes.
-                </Typography>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
+              {totalPages > 1 && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3 }}>
+                  <Pagination
+                    count={totalPages}
+                    page={currentPage}
+                    onChange={handlePageChange}
+                    color="primary"
+                  />
+                </Box>
+              )}
+            </>
+          )}
+        </Paper>
       </Container>
     </Box>
   );

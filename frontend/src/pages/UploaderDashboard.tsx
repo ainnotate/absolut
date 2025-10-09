@@ -38,6 +38,8 @@ import { useDropzone } from 'react-dropzone';
 import { authService } from '../services/authService';
 import { User } from '../types';
 
+const API_BASE = 'http://192.168.29.158:5003';
+
 type CategoryType = '.eml' | '.eml + pdf' | '.txt';
 
 interface FileWithPreview extends File {
@@ -253,7 +255,7 @@ const UploaderDashboard: React.FC = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/upload', {
+      const response = await fetch(`${API_BASE}/api/upload`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`

@@ -109,7 +109,7 @@ const App: React.FC = () => {
             } 
           />
           <Route 
-            path="/supervisor" 
+            path="/supervisor/dashboard" 
             element={
               <SupervisorRoute>
                 <SupervisorDashboard />
@@ -117,10 +117,18 @@ const App: React.FC = () => {
             } 
           />
           <Route 
-            path="/supervisor/review" 
+            path="/supervisor/review/:assetId" 
             element={
               <SupervisorRoute>
                 <SupervisorReview />
+              </SupervisorRoute>
+            } 
+          />
+          <Route 
+            path="/supervisor" 
+            element={
+              <SupervisorRoute>
+                <SupervisorDashboard />
               </SupervisorRoute>
             } 
           />

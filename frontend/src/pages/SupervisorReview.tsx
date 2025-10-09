@@ -10,169 +10,270 @@ import {
   Grid,
   Box,
   Card,
-  CardContent,
   TextField,
-  Tabs,
-  Tab,
-  Alert,
   CircularProgress,
   Stack,
-  Divider,
-  Chip,
+  Alert,
+  Snackbar,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Snackbar
 } from '@mui/material';
 import {
   Logout,
   CheckCircle,
   Cancel,
-  ContactSupport,
+  Save,
   ArrowBack,
-  Edit,
-  ExpandMore,
   Description,
   PictureAsPdf,
   Email,
   TextSnippet,
-  Download,
-  CompareArrows,
-  Person,
-  Schedule
+  ExpandMore,
+  Translate,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
-import { authService } from '../services/authService';
+import { useNavigate, useParams } from 'react-router-dom';
 
-interface Asset {
-  id: number;
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5003/api';
+
+// Define category and subcategory mappings
+const categorySubcategories: Record<string, string[]> = {
+  'Flight': ['Airline', 'Third-party provider'],
+  'Hotel': ['Hotel', 'Third-party provider'],
+  'Restaurant': ['Directly from restaurant', 'Reservation providers'],
+  'Rental Car': ['Rental car companies', 'Third-party provider'],
+  'Train': ['Train company', 'Third-party provider'],
+  'Bus': ['Bus company', 'Third-party provider'],
+  'Ferry': ['Ferry company'],
+  'Movie': ['Movie theater', 'Movie ticket provider'],
+  'Shows': ['Show ticket provider'],
+  'Party Invitations': ['Invitation Provider – Text', 'Invitation Provider – Image'],
+  'Appointments': ['Doctor Appointments']
+};
+
+interface AssetDetails {
   asset_id: string;
   user_id: number;
   deliverable_type: string;
   metadata: any;
-  metadata_before?: any;
-  metadata_after?: any;
   created_date: string;
-  uploader_username: string;
-  uploader_email: string;
-  qc_username: string;
-  qc_email: string;
-  qc_action: string;
-  qc_reject_reason?: string;
-  qc_notes?: string;
-  qc_completed_date: string;
+  batch_id?: string;
+  assigned_to?: number;
+  qc_status?: string;
+  qc_completed_date?: string;
+  qc_comments?: string;
+  uploader_name?: string;
+  uploader_email?: string;
+  qc_username?: string;
+  qc_email?: string;
 }
 
-interface AssetFile {
+interface FileDetails {
   id: number;
   filename: string;
   file_type: string;
   s3_key: string;
+  md5_hash: string;
+  upload_date: string;
 }
-
-const API_BASE = 'http://192.168.29.158:5003';
 
 const SupervisorReview: React.FC = () => {
   const navigate = useNavigate();
-  const [currentAsset, setCurrentAsset] = useState<Asset | null>(null);
-  const [assetFiles, setAssetFiles] = useState<AssetFile[]>([]);
-  const [hasNext, setHasNext] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [supervisorNotes, setSupervisorNotes] = useState('');
-  const [editedMetadata, setEditedMetadata] = useState<any>({});
+  const { assetId } = useParams<{ assetId: string }>();
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  
+  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [selectedFileTab, setSelectedFileTab] = useState(0);
+  const [asset, setAsset] = useState<AssetDetails | null>(null);
+  const [assetFiles, setAssetFiles] = useState<FileDetails[]>([]);
   const [fileContents, setFileContents] = useState<{ [key: string]: string }>({});
-  const [actionDialog, setActionDialog] = useState(false);
-  const [selectedAction, setSelectedAction] = useState<'approved' | 'rejected' | 'consulted' | null>(null);
+  const [translatedContent, setTranslatedContent] = useState<{ [key: string]: string }>({});
+  const [supervisorNotes, setSupervisorNotes] = useState('');
+  const [assetStatus, setAssetStatus] = useState<'approved' | 'rejected'>('approved');
+  const [editedMetadata, setEditedMetadata] = useState<any>({});
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string>('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
 
-  const currentUser = authService.getUser();
+  // Sequential review state
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [assetList, setAssetList] = useState<string[]>([]);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrevious, setHasPrevious] = useState(false);
 
   useEffect(() => {
-    fetchNextAsset();
-  }, []);
-
-  useEffect(() => {
-    if (currentAsset) {
-      setEditedMetadata(currentAsset.metadata || {});
+    loadCurrentUser();
+    if (assetId) {
+      loadAsset();
     }
-  }, [currentAsset]);
+    loadSequentialReviewState();
+  }, [assetId]);
 
-  const fetchNextAsset = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-
-      const response = await fetch(`${API_BASE}/api/supervisor/next-review`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch next asset');
+  const loadCurrentUser = () => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        setCurrentUser(payload);
+      } catch (error) {
+        console.error('Error parsing token:', error);
+        navigate('/login');
       }
-
-      const data = await response.json();
-      
-      if (data.asset) {
-        setCurrentAsset(data.asset);
-        setAssetFiles(data.files || []);
-        setHasNext(data.hasNext);
-        setSelectedFileTab(0);
-        setFileContents({});
-        setSupervisorNotes('');
-        
-        // Load file contents
-        data.files?.forEach((file: AssetFile) => {
-          loadFileContent(file);
-        });
-      } else {
-        // No more assets
-        setSnackbar({
-          open: true,
-          message: 'No more assets to review!',
-          severity: 'success'
-        });
-        setTimeout(() => navigate('/supervisor'), 2000);
-      }
-    } catch (error) {
-      console.error('Error fetching next asset:', error);
-      setSnackbar({
-        open: true,
-        message: 'Failed to fetch next asset',
-        severity: 'error'
-      });
-    } finally {
-      setLoading(false);
+    } else {
+      navigate('/login');
     }
   };
 
-  const loadFileContent = async (file: AssetFile) => {
+  const loadSequentialReviewState = () => {
+    const storedList = sessionStorage.getItem('supervisorAssetList');
+    const storedIndex = sessionStorage.getItem('supervisorAssetIndex');
+    
+    if (storedList && storedIndex) {
+      const list = JSON.parse(storedList);
+      const index = parseInt(storedIndex);
+      setAssetList(list);
+      setCurrentIndex(index);
+      setHasNext(index < list.length - 1);
+      setHasPrevious(index > 0);
+    }
+  };
+
+  const loadAsset = async () => {
     try {
+      setLoading(true);
+
       const token = localStorage.getItem('token');
-      
-      const response = await fetch(`${API_BASE}/api/qc/file/${encodeURIComponent(file.s3_key)}`, {
+      const response = await fetch(`${API_URL}/supervisor/assets/${assetId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
 
       if (response.ok) {
+        const data = await response.json();
+        setAsset(data.asset);
+        setAssetFiles(data.files);
+        
+        // Set initial status from QC decision
+        if (data.asset.qc_status) {
+          setAssetStatus(data.asset.qc_status as 'approved' | 'rejected');
+        }
+        if (data.asset.supervisor_notes) {
+          setSupervisorNotes(data.asset.supervisor_notes);
+        }
+        
+        // Initialize metadata for editing
+        setEditedMetadata(data.asset.metadata || {});
+        
+        // Initialize booking category dropdowns
+        const bookingCategory = data.asset.metadata?.bookingCategory || '';
+        if (bookingCategory.includes(' - ')) {
+          const [category, subcategory] = bookingCategory.split(' - ');
+          setSelectedCategory(category);
+          setSelectedSubcategory(subcategory);
+        }
+
+        // Load file contents and auto-translate
+        setFileContents({});
+        setTranslatedContent({});
+        data.files?.forEach((file: FileDetails) => {
+          loadFileContent(file);
+        });
+      } else {
+        const errorData = await response.json();
+        setSnackbar({ open: true, message: errorData.error || 'Failed to load asset', severity: 'error' });
+      }
+    } catch (error) {
+      setSnackbar({ open: true, message: 'Failed to load asset', severity: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadFileContent = async (file: FileDetails) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/qc/file/${encodeURIComponent(file.s3_key)}?token=${token}`);
+      
+      if (response.ok) {
         const content = await response.text();
         setFileContents(prev => ({
           ...prev,
           [file.s3_key]: content
         }));
+        
+        // Auto-translate the content
+        handleTranslate(file.s3_key, content);
       }
     } catch (error) {
-      console.error(`Error loading file content for ${file.filename}:`, error);
+      console.error('Error loading file content:', error);
     }
+  };
+
+  const handleTranslate = async (fileKey: string, content: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      
+      // Call the real translation API
+      const response = await fetch(`${API_URL}/translation/translate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          text: content,
+          targetLanguage: 'en', // Translate to English
+          sourceLanguage: 'auto' // Auto-detect source language
+        })
+      });
+
+      if (response.ok) {
+        const translationResult = await response.json();
+        setTranslatedContent(prev => ({
+          ...prev,
+          [fileKey]: translationResult.translatedText
+        }));
+        
+        // Show success message with detected language
+        setSnackbar({
+          open: true,
+          message: `Translated from ${translationResult.sourceLanguage} to ${translationResult.targetLanguage}`,
+          severity: 'success'
+        });
+      } else {
+        throw new Error('Translation failed');
+      }
+    } catch (error) {
+      console.error('Error translating content:', error);
+      setSnackbar({
+        open: true,
+        message: 'Translation failed. Please try again.',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleApprove = () => {
+    setAssetStatus('approved');
+    setSnackbar({
+      open: true,
+      message: 'Asset marked as approved',
+      severity: 'success'
+    });
+  };
+
+  const handleReject = () => {
+    setAssetStatus('rejected');
+    setSnackbar({
+      open: true,
+      message: 'Asset marked as rejected',
+      severity: 'success'
+    });
   };
 
   const handleMetadataChange = (field: string, value: any) => {
@@ -182,63 +283,91 @@ const SupervisorReview: React.FC = () => {
     }));
   };
 
-  const handleAction = (action: 'approved' | 'rejected' | 'consulted') => {
-    setSelectedAction(action);
-    setActionDialog(true);
+  const handleCategorySelect = (value: string) => {
+    setSelectedCategory(value);
+    setSelectedSubcategory(''); // Reset subcategory when category changes
+    setEditedMetadata((prev: any) => ({ ...prev, bookingCategory: '' })); // Reset the combined value
   };
 
-  const handleConfirmAction = async () => {
-    if (!currentAsset || !selectedAction) return;
+  const handleSubcategorySelect = (value: string) => {
+    setSelectedSubcategory(value);
+    // Combine category and subcategory for backend
+    if (selectedCategory && value) {
+      setEditedMetadata((prev: any) => ({ ...prev, bookingCategory: `${selectedCategory} - ${value}` }));
+    }
+  };
+
+  const canSubmit = () => {
+    return assetStatus && (assetStatus !== asset?.qc_status || supervisorNotes.trim() || JSON.stringify(editedMetadata) !== JSON.stringify(asset?.metadata));
+  };
+
+  const handleSubmit = async () => {
+    if (!asset || !canSubmit()) return;
 
     try {
       setSubmitting(true);
-      const token = localStorage.getItem('token');
 
-      const response = await fetch(`${API_BASE}/api/supervisor/review/${currentAsset.asset_id}`, {
-        method: 'POST',
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_URL}/supervisor/assets/${assetId}/status`, {
+        method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          action: selectedAction,
-          notes: supervisorNotes,
-          updatedMetadata: editedMetadata
+          status: assetStatus,
+          supervisor_notes: supervisorNotes,
+          updated_metadata: editedMetadata
         })
       });
 
       if (response.ok) {
-        setSnackbar({
-          open: true,
-          message: `Asset ${selectedAction} successfully`,
-          severity: 'success'
-        });
+        setSnackbar({ open: true, message: 'Supervisor review submitted successfully', severity: 'success' });
         
-        setActionDialog(false);
-        setSelectedAction(null);
-        
-        // Move to next asset
+        // Auto-navigate to next asset if in sequential review mode
         setTimeout(() => {
-          fetchNextAsset();
-        }, 1000);
+          if (hasNext) {
+            navigateToNext();
+          } else {
+            navigateBackToDashboard();
+          }
+        }, 1500);
       } else {
-        throw new Error(`Failed to ${selectedAction} asset`);
+        const errorData = await response.json();
+        setSnackbar({ open: true, message: errorData.error || 'Failed to submit review', severity: 'error' });
       }
     } catch (error) {
-      console.error(`Error ${selectedAction} asset:`, error);
-      setSnackbar({
-        open: true,
-        message: `Failed to ${selectedAction} asset`,
-        severity: 'error'
-      });
+      setSnackbar({ open: true, message: 'Failed to submit review', severity: 'error' });
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleLogout = () => {
-    authService.logout();
-    window.location.href = '/';
+  const navigateToNext = () => {
+    if (hasNext && currentIndex < assetList.length - 1) {
+      const nextIndex = currentIndex + 1;
+      const nextAssetId = assetList[nextIndex];
+      sessionStorage.setItem('supervisorAssetIndex', nextIndex.toString());
+      navigate(`/supervisor/review/${nextAssetId}`);
+    }
+  };
+
+  const navigateToPrevious = () => {
+    if (hasPrevious && currentIndex > 0) {
+      const prevIndex = currentIndex - 1;
+      const prevAssetId = assetList[prevIndex];
+      sessionStorage.setItem('supervisorAssetIndex', prevIndex.toString());
+      navigate(`/supervisor/review/${prevAssetId}`);
+    }
+  };
+
+  const navigateBackToDashboard = () => {
+    navigate('/supervisor/dashboard');
+  };
+
+  const handleLogout = async () => {
+    localStorage.removeItem('token');
+    navigate('/login');
   };
 
   const getFileIcon = (fileType: string) => {
@@ -250,8 +379,9 @@ const SupervisorReview: React.FC = () => {
     }
   };
 
-  const renderFileContent = (file: AssetFile) => {
+  const renderFileContent = (file: FileDetails) => {
     const content = fileContents[file.s3_key];
+    const translation = translatedContent[file.s3_key];
 
     if (!content) {
       return <CircularProgress />;
@@ -262,102 +392,114 @@ const SupervisorReview: React.FC = () => {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h6">{file.filename}</Typography>
           <Button
-            startIcon={<Download />}
-            onClick={() => {
-              const token = localStorage.getItem('token');
-              window.open(`${API_BASE}/api/qc/file-url/${encodeURIComponent(file.s3_key)}?token=${token}`);
-            }}
+            startIcon={<Translate />}
+            onClick={() => handleTranslate(file.s3_key, content)}
+            disabled={!content}
           >
-            Download
+            Re-translate
           </Button>
         </Box>
 
         {file.file_type.toLowerCase() === 'pdf' ? (
-          <Box sx={{ height: 600, border: '1px solid #ccc' }}>
-            <iframe
-              src={`${API_BASE}/api/qc/file/${encodeURIComponent(file.s3_key)}?token=${localStorage.getItem('token')}`}
-              width="100%"
-              height="100%"
-              title={file.filename}
-            />
-          </Box>
+          <Stack spacing={3}>
+            {/* PDF Viewer */}
+            <Box>
+              <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                PDF Document
+              </Typography>
+              <Box sx={{ height: 600, border: '1px solid #ccc', overflow: 'hidden' }}>
+                <object
+                  data={`${API_URL}/qc/file/${encodeURIComponent(file.s3_key)}?token=${localStorage.getItem('token')}`}
+                  type="application/pdf"
+                  width="100%"
+                  height="100%"
+                  aria-label={file.filename}
+                >
+                  <embed
+                    src={`${API_URL}/qc/file/${encodeURIComponent(file.s3_key)}?token=${localStorage.getItem('token')}`}
+                    type="application/pdf"
+                    width="100%"
+                    height="100%"
+                  />
+                  <p>Your browser does not support PDFs. 
+                    <a href={`${API_URL}/qc/file/${encodeURIComponent(file.s3_key)}?token=${localStorage.getItem('token')}`}>
+                      Download the PDF
+                    </a>
+                  </p>
+                </object>
+              </Box>
+            </Box>
+
+            {/* Translation */}
+            {translation && (
+              <Box>
+                <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                  Translation
+                </Typography>
+                <Paper sx={{ p: 2, maxHeight: 300, overflow: 'auto', bgcolor: 'lightblue', opacity: 0.8 }}>
+                  <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-wrap' }}>
+                    {translation}
+                  </Typography>
+                </Paper>
+              </Box>
+            )}
+          </Stack>
         ) : (
-          <Paper sx={{ p: 2, maxHeight: 400, overflow: 'auto', bgcolor: 'grey.50' }}>
-            <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-wrap' }}>
-              {content}
-            </Typography>
-          </Paper>
+          <Stack spacing={3}>
+            {/* Original Content */}
+            <Box>
+              <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Original Content
+              </Typography>
+              <Paper sx={{ p: 2, maxHeight: 400, overflow: 'auto', bgcolor: 'grey.50' }}>
+                <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {content}
+                </Typography>
+              </Paper>
+            </Box>
+            
+            {/* Action Buttons */}
+            <Box>
+              <Stack direction="row" spacing={2} sx={{ justifyContent: 'center' }}>
+                <Button
+                  variant={assetStatus === 'approved' ? 'contained' : 'outlined'}
+                  color="success"
+                  startIcon={<CheckCircle />}
+                  onClick={handleApprove}
+                  disabled={submitting || asset?.qc_status === 'approved'}
+                  size="large"
+                  sx={{ minWidth: 150 }}
+                >
+                  {assetStatus === 'approved' ? '✓ Approved' : 'Approve (a)'}
+                </Button>
+                <Button
+                  variant={assetStatus === 'rejected' ? 'contained' : 'outlined'}
+                  color="error"
+                  startIcon={<Cancel />}
+                  onClick={handleReject}
+                  disabled={submitting || asset?.qc_status === 'rejected'}
+                  size="large"
+                  sx={{ minWidth: 150 }}
+                >
+                  {assetStatus === 'rejected' ? '✗ Rejected' : 'Reject (r)'}
+                </Button>
+              </Stack>
+            </Box>
+            
+            {/* Translation Section */}
+            <Box>
+              <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                Translation
+              </Typography>
+              <Paper sx={{ p: 2, maxHeight: 400, overflow: 'auto', bgcolor: 'blue.50', border: '1px solid', borderColor: 'primary.light' }}>
+                <Typography variant="body2" component="pre" sx={{ whiteSpace: 'pre-wrap' }}>
+                  {translation || 'Translation loading...'}
+                </Typography>
+              </Paper>
+            </Box>
+          </Stack>
         )}
       </Box>
-    );
-  };
-
-  const renderMetadataComparison = () => {
-    if (!currentAsset?.metadata_before && !currentAsset?.metadata_after) {
-      return null;
-    }
-
-    const before = currentAsset.metadata_before || {};
-    const after = currentAsset.metadata_after || {};
-    const allKeys = new Set([...Object.keys(before), ...Object.keys(after)]);
-
-    return (
-      <Accordion>
-        <AccordionSummary expandIcon={<ExpandMore />}>
-          <Typography variant="h6">
-            <CompareArrows sx={{ mr: 1, verticalAlign: 'middle' }} />
-            Metadata Changes by QC
-          </Typography>
-        </AccordionSummary>
-        <AccordionDetails>
-          <Grid container spacing={2}>
-            <Grid item xs={6}>
-              <Typography variant="subtitle2" gutterBottom>Original</Typography>
-            </Grid>
-            <Grid item xs={6}>
-              <Typography variant="subtitle2" gutterBottom>After QC</Typography>
-            </Grid>
-            {Array.from(allKeys).map((key) => {
-              const beforeValue = before[key] || '';
-              const afterValue = after[key] || '';
-              const hasChanged = beforeValue !== afterValue;
-              
-              return (
-                <React.Fragment key={key}>
-                  <Grid item xs={6}>
-                    <TextField
-                      label={key}
-                      value={beforeValue}
-                      disabled
-                      fullWidth
-                      size="small"
-                      sx={{ 
-                        '& .MuiInputBase-input': { 
-                          bgcolor: hasChanged ? '#ffebee' : 'transparent' 
-                        }
-                      }}
-                    />
-                  </Grid>
-                  <Grid item xs={6}>
-                    <TextField
-                      label={key}
-                      value={afterValue}
-                      disabled
-                      fullWidth
-                      size="small"
-                      sx={{ 
-                        '& .MuiInputBase-input': { 
-                          bgcolor: hasChanged ? '#e8f5e8' : 'transparent' 
-                        }
-                      }}
-                    />
-                  </Grid>
-                </React.Fragment>
-              );
-            })}
-          </Grid>
-        </AccordionDetails>
-      </Accordion>
     );
   };
 
@@ -369,7 +511,7 @@ const SupervisorReview: React.FC = () => {
     );
   }
 
-  if (!currentAsset) {
+  if (!asset) {
     return (
       <Container>
         <Alert severity="info">No assets available for supervisor review</Alert>
@@ -381,11 +523,11 @@ const SupervisorReview: React.FC = () => {
     <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static">
         <Toolbar>
-          <IconButton color="inherit" onClick={() => navigate('/supervisor')}>
+          <IconButton color="inherit" onClick={navigateBackToDashboard}>
             <ArrowBack />
           </IconButton>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Supervisor Review - {currentAsset.asset_id}
+            Supervisor Review - {asset.asset_id}
           </Typography>
           <Typography variant="body2" sx={{ mr: 2 }}>
             {currentUser?.username} (Supervisor)
@@ -396,218 +538,196 @@ const SupervisorReview: React.FC = () => {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="xl" sx={{ mt: 2 }}>
+      <Box sx={{ p: 2 }}>
         <Grid container spacing={3}>
-          {/* Left side - File viewer */}
+          {/* Left side - File viewer and buttons (same as QC interface) */}
           <Grid item xs={12} md={8}>
-            <Paper sx={{ height: 'calc(100vh - 200px)' }}>
-              <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                <Tabs 
-                  value={selectedFileTab} 
-                  onChange={(_, newValue) => setSelectedFileTab(newValue)}
-                  variant="scrollable"
-                  scrollButtons="auto"
-                >
-                  {assetFiles.map((file, index) => (
-                    <Tab 
-                      key={file.id}
-                      icon={getFileIcon(file.file_type)}
-                      label={file.filename}
-                      iconPosition="start"
-                    />
-                  ))}
-                </Tabs>
-              </Box>
-              
-              <Box sx={{ p: 2, height: 'calc(100% - 48px)', overflow: 'auto' }}>
-                {assetFiles[selectedFileTab] && renderFileContent(assetFiles[selectedFileTab])}
-              </Box>
-            </Paper>
+            <Box sx={{ height: 'calc(100vh - 120px)', overflow: 'auto' }}>
+              {assetFiles.map((file, index) => (
+                <Box key={file.id} sx={{ mb: index < assetFiles.length - 1 ? 3 : 0 }}>
+                  {renderFileContent(file)}
+                </Box>
+              ))}
+            </Box>
           </Grid>
 
-          {/* Right side - Asset info and controls */}
+          {/* Right side - Supervisor controls */}
           <Grid item xs={12} md={4}>
             <Stack spacing={2}>
               {/* Asset Info */}
               <Card>
-                <CardContent>
+                <Box sx={{ p: 2 }}>
                   <Typography variant="h6" gutterBottom>Asset Information</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="body2">ID: {currentAsset.asset_id}</Typography>
-                    <Chip 
-                      label={currentAsset.deliverable_type} 
-                      size="small" 
-                      sx={{ ml: 1 }}
-                    />
-                  </Box>
+                  <Typography variant="body2">ID: {asset.asset_id}</Typography>
+                  <Typography variant="body2">Type: {asset.deliverable_type}</Typography>
+                  <Typography variant="body2">Uploader: {asset.uploader_name || 'N/A'}</Typography>
+                  <Typography variant="body2">Created: {new Date(asset.created_date).toLocaleString()}</Typography>
                   <Typography variant="body2">Files: {assetFiles.length}</Typography>
-                  <Typography variant="body2">Created: {new Date(currentAsset.created_date).toLocaleString()}</Typography>
-                </CardContent>
+                </Box>
               </Card>
 
-              {/* QC Review Info */}
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" gutterBottom>QC Review Details</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                    <Person sx={{ mr: 1 }} />
-                    <Box>
-                      <Typography variant="body2">Uploader: {currentAsset.uploader_username}</Typography>
-                      <Typography variant="body2">QC User: {currentAsset.qc_username}</Typography>
-                    </Box>
-                  </Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                    <Schedule sx={{ mr: 1 }} />
-                    <Typography variant="body2">
-                      QC Date: {new Date(currentAsset.qc_completed_date).toLocaleString()}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ mt: 2 }}>
-                    <Chip 
-                      label={`QC ${currentAsset.qc_action}`}
-                      color={currentAsset.qc_action === 'approved' ? 'success' : 'error'}
-                      size="small"
-                    />
-                  </Box>
-                  {currentAsset.qc_reject_reason && (
-                    <Box sx={{ mt: 2, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Reject Reason:
-                      </Typography>
-                      <Typography variant="body2">
-                        {currentAsset.qc_reject_reason}
-                      </Typography>
-                    </Box>
-                  )}
-                  {currentAsset.qc_notes && (
-                    <Box sx={{ mt: 2, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
-                      <Typography variant="caption" color="text.secondary">
-                        QC Notes:
-                      </Typography>
-                      <Typography variant="body2">
-                        {currentAsset.qc_notes}
-                      </Typography>
-                    </Box>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Metadata comparison */}
-              {renderMetadataComparison()}
-
-              {/* Current Metadata Editor */}
+              {/* Editable Metadata */}
               <Accordion defaultExpanded>
                 <AccordionSummary expandIcon={<ExpandMore />}>
-                  <Typography variant="h6">Current Metadata</Typography>
+                  <Typography variant="h6">Metadata</Typography>
                 </AccordionSummary>
                 <AccordionDetails>
                   <Stack spacing={2}>
-                    {Object.entries(editedMetadata).map(([key, value]) => (
-                      <TextField
-                        key={key}
-                        label={key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                        value={value as string}
-                        onChange={(e) => handleMetadataChange(key, e.target.value)}
-                        fullWidth
-                        size="small"
-                      />
-                    ))}
+                    {/* Asset Owner Gender */}
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Asset Owner Gender</InputLabel>
+                      <Select
+                        value={editedMetadata.assetOwnerGender || ''}
+                        onChange={(e) => handleMetadataChange('assetOwnerGender', e.target.value)}
+                        label="Asset Owner Gender"
+                      >
+                        <MenuItem value="Male">Male</MenuItem>
+                        <MenuItem value="Female">Female</MenuItem>
+                        <MenuItem value="Others">Others</MenuItem>
+                      </Select>
+                    </FormControl>
+
+                    {/* Asset Owner Age */}
+                    <TextField
+                      label="Asset Owner Age"
+                      type="number"
+                      value={editedMetadata.assetOwnerAge || ''}
+                      onChange={(e) => handleMetadataChange('assetOwnerAge', e.target.value)}
+                      fullWidth
+                      size="small"
+                    />
+
+                    {/* Locale */}
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Locale</InputLabel>
+                      <Select
+                        value={editedMetadata.locale || ''}
+                        onChange={(e) => handleMetadataChange('locale', e.target.value)}
+                        label="Locale"
+                      >
+                        <MenuItem value="zh_TW">zh_TW - Traditional Chinese (Taiwan 🇹🇼)</MenuItem>
+                        <MenuItem value="zh_HK">zh_HK - Traditional Chinese (Hong Kong 🇭🇰)</MenuItem>
+                        <MenuItem value="vi_VN">vi_VN - Vietnamese (Vietnam 🇻🇳)</MenuItem>
+                        <MenuItem value="nl_NL">nl_NL - Dutch (Netherlands 🇳🇱)</MenuItem>
+                        <MenuItem value="nl_BE">nl_BE - Dutch / Flemish (Belgium 🇧🇪)</MenuItem>
+                        <MenuItem value="da_DK">da_DK - Danish (Denmark 🇩🇰)</MenuItem>
+                        <MenuItem value="sv_SE">sv_SE - Swedish (Sweden 🇸🇪)</MenuItem>
+                        <MenuItem value="nb_NO">nb_NO - Norwegian - Bokmål (Norway 🇳🇴)</MenuItem>
+                      </Select>
+                    </FormControl>
+
+                    {/* Source Name */}
+                    <TextField
+                      label="Source Name"
+                      value={editedMetadata.sourceName || ''}
+                      onChange={(e) => handleMetadataChange('sourceName', e.target.value)}
+                      fullWidth
+                      size="small"
+                      placeholder="e.g., agoda.com, booking.com"
+                    />
+
+                    {/* Booking Category */}
+                    <Box>
+                      <Typography variant="body2" gutterBottom>
+                        <strong>Booking Category</strong>
+                      </Typography>
+                      <Grid container spacing={1}>
+                        <Grid item xs={6}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>Category</InputLabel>
+                            <Select
+                              value={selectedCategory}
+                              onChange={(e) => handleCategorySelect(e.target.value)}
+                              label="Category"
+                            >
+                              {Object.keys(categorySubcategories).map((category) => (
+                                <MenuItem key={category} value={category}>
+                                  {category}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <FormControl fullWidth size="small">
+                            <InputLabel>Subcategory</InputLabel>
+                            <Select
+                              value={selectedSubcategory}
+                              onChange={(e) => handleSubcategorySelect(e.target.value)}
+                              label="Subcategory"
+                              disabled={!selectedCategory}
+                            >
+                              {selectedCategory && categorySubcategories[selectedCategory]?.map((subcategory) => (
+                                <MenuItem key={subcategory} value={subcategory}>
+                                  {subcategory}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Grid>
+                      </Grid>
+                      {editedMetadata.bookingCategory && (
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                          Selected: {editedMetadata.bookingCategory}
+                        </Typography>
+                      )}
+                    </Box>
+
+                    {/* Booking Type */}
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Booking Type</InputLabel>
+                      <Select
+                        value={editedMetadata.bookingType || ''}
+                        onChange={(e) => handleMetadataChange('bookingType', e.target.value)}
+                        label="Booking Type"
+                      >
+                        <MenuItem value="Invitation">Invitation</MenuItem>
+                        <MenuItem value="Confirmation">Confirmation</MenuItem>
+                        <MenuItem value="Modification">Modification</MenuItem>
+                        <MenuItem value="Cancellation">Cancellation</MenuItem>
+                        <MenuItem value="Deliverable Type">Deliverable Type</MenuItem>
+                      </Select>
+                    </FormControl>
                   </Stack>
                 </AccordionDetails>
               </Accordion>
 
               {/* Supervisor Notes */}
               <Card>
-                <CardContent>
+                <Box sx={{ p: 2 }}>
                   <Typography variant="h6" gutterBottom>Supervisor Notes</Typography>
                   <TextField
                     multiline
-                    rows={3}
+                    rows={4}
                     fullWidth
-                    placeholder="Add your supervisor review notes..."
+                    placeholder="Add guidance notes for the QC team..."
                     value={supervisorNotes}
                     onChange={(e) => setSupervisorNotes(e.target.value)}
                   />
-                </CardContent>
+                </Box>
               </Card>
 
-              {/* Action Buttons */}
-              <Grid container spacing={1}>
-                <Grid item xs={4}>
+              {/* Submit Button */}
+              <Card>
+                <Box sx={{ p: 2 }}>
                   <Button
                     variant="contained"
-                    color="success"
-                    startIcon={<CheckCircle />}
-                    onClick={() => handleAction('approved')}
-                    disabled={submitting}
+                    color="primary"
+                    startIcon={<Save />}
+                    onClick={handleSubmit}
+                    disabled={submitting || !canSubmit()}
                     fullWidth
-                    size="small"
+                    size="large"
                   >
-                    Approve
+                    {submitting ? 'Submitting...' : canSubmit() ? 'Submit Review' : 'No Changes to Submit'}
                   </Button>
-                </Grid>
-                <Grid item xs={4}>
-                  <Button
-                    variant="contained"
-                    color="error"
-                    startIcon={<Cancel />}
-                    onClick={() => handleAction('rejected')}
-                    disabled={submitting}
-                    fullWidth
-                    size="small"
-                  >
-                    Reject
-                  </Button>
-                </Grid>
-                <Grid item xs={4}>
-                  <Button
-                    variant="contained"
-                    color="info"
-                    startIcon={<ContactSupport />}
-                    onClick={() => handleAction('consulted')}
-                    disabled={submitting}
-                    fullWidth
-                    size="small"
-                  >
-                    Consult
-                  </Button>
-                </Grid>
-              </Grid>
+                </Box>
+              </Card>
+
             </Stack>
           </Grid>
         </Grid>
-      </Container>
-
-      {/* Action Confirmation Dialog */}
-      <Dialog open={actionDialog} onClose={() => setActionDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          Confirm {selectedAction?.charAt(0).toUpperCase()}{selectedAction?.slice(1)} Action
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body1" gutterBottom>
-            Are you sure you want to {selectedAction} this asset?
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Asset ID: {currentAsset?.asset_id}
-          </Typography>
-          {supervisorNotes && (
-            <Box sx={{ mt: 2, p: 1, bgcolor: 'grey.100', borderRadius: 1 }}>
-              <Typography variant="caption" color="text.secondary">Notes:</Typography>
-              <Typography variant="body2">{supervisorNotes}</Typography>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setActionDialog(false)}>Cancel</Button>
-          <Button 
-            onClick={handleConfirmAction} 
-            variant="contained" 
-            color={selectedAction === 'approved' ? 'success' : selectedAction === 'rejected' ? 'error' : 'info'}
-          >
-            Confirm {selectedAction?.charAt(0).toUpperCase()}{selectedAction?.slice(1)}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      </Box>
 
       {/* Snackbar */}
       <Snackbar
