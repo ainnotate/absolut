@@ -158,7 +158,7 @@ const getBatchesByCategory = async (req, res) => {
         COUNT(*) as total_assets,
         COUNT(CASE WHEN assigned_to IS NULL THEN 1 END) as unassigned_count,
         COUNT(CASE WHEN qc_status = 'pending' OR qc_status IS NULL THEN 1 END) as pending_count,
-        COUNT(CASE WHEN qc_status = 'completed' THEN 1 END) as completed_count,
+        COUNT(CASE WHEN qc_status = 'approved' THEN 1 END) as completed_count,
         COUNT(CASE WHEN assigned_to IS NOT NULL AND (qc_status = 'pending' OR qc_status = 'in_progress') THEN 1 END) as in_progress_count
       FROM assets
       WHERE json_extract(metadata, '$.locale') = ? 
@@ -235,7 +235,7 @@ const getBatchesByType = async (req, res) => {
         COUNT(*) as total_assets,
         COUNT(CASE WHEN assigned_to IS NULL THEN 1 END) as unassigned_count,
         COUNT(CASE WHEN qc_status = 'pending' OR qc_status IS NULL THEN 1 END) as pending_count,
-        COUNT(CASE WHEN qc_status = 'completed' THEN 1 END) as completed_count,
+        COUNT(CASE WHEN qc_status = 'approved' THEN 1 END) as completed_count,
         COUNT(CASE WHEN assigned_to IS NOT NULL AND (qc_status = 'pending' OR qc_status = 'in_progress') THEN 1 END) as in_progress_count
       FROM assets
       WHERE json_extract(metadata, '$.locale') = ? AND deliverable_type = ?
@@ -461,7 +461,7 @@ const getUserBatches = async (req, res) => {
         ba.completed_assets,
         COUNT(DISTINCT a.id) as total_assets,
         COUNT(CASE WHEN a.qc_status = 'pending' THEN 1 END) as pending_count,
-        COUNT(CASE WHEN a.qc_status = 'completed' THEN 1 END) as completed_count
+        COUNT(CASE WHEN a.qc_status = 'approved' THEN 1 END) as completed_count
       FROM batch_assignments ba
       LEFT JOIN assets a ON a.batch_id = ba.batch_id AND a.assigned_to = ba.user_id
       WHERE ba.user_id = ? AND ba.active = 1
@@ -492,7 +492,7 @@ const getAllBatches = async (req, res) => {
         COUNT(*) as total_assets,
         COUNT(CASE WHEN assigned_to IS NULL THEN 1 END) as unassigned_count,
         COUNT(CASE WHEN assigned_to IS NOT NULL THEN 1 END) as assigned_count,
-        COUNT(CASE WHEN qc_status = 'completed' THEN 1 END) as completed_count,
+        COUNT(CASE WHEN qc_status = 'approved' THEN 1 END) as completed_count,
         COUNT(CASE WHEN supervisor_status = 'approved' THEN 1 END) as supervisor_approved
       FROM assets
       WHERE metadata IS NOT NULL

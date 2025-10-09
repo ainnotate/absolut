@@ -1,300 +1,352 @@
 const { db } = require('../models/database');
 
-// Get assets for supervisor review
-const getAssetsForReview = async (req, res) => {
+// Get supervisor dashboard statistics
+const getStatistics = async (req, res) => {
   try {
-    const { status = 'pending' } = req.query;
+    const statistics = await new Promise((resolve, reject) => {
+      db.serialize(() => {
+        const stats = {};
 
-    const query = `
-      SELECT 
-        a.*,
-        u.username as uploader_username,
-        u.email as uploader_email,
-        qc.username as qc_username,
-        qc.email as qc_email,
-        GROUP_CONCAT(
-          json_object(
-            'id', up.id,
-            'filename', up.filename,
-            'file_type', up.file_type,
-            's3_key', up.s3_key
-          )
-        ) as files
-      FROM assets a
-      LEFT JOIN users u ON a.user_id = u.id
-      LEFT JOIN users qc ON a.qc_completed_by = qc.id
-      LEFT JOIN uploads up ON a.asset_id = up.asset_id
-      WHERE a.send_to_supervisor = 1
-    `;
+        // Get total assets
+        db.get(
+          'SELECT COUNT(*) as count FROM assets',
+          (err, result) => {
+            if (err) return reject(err);
+            stats.total_assets = result.count;
 
-    const params = [];
-
-    if (status) {
-      query += ' AND a.supervisor_status = ?';
-      params.push(status);
-    }
-
-    query += ' GROUP BY a.id ORDER BY a.qc_completed_date DESC';
-
-    db.all(query, params, (err, assets) => {
-      if (err) {
-        console.error('Error fetching supervisor assets:', err);
-        return res.status(500).json({ error: 'Failed to fetch assets for review' });
-      }
-
-      // Parse files JSON and metadata
-      const assetsWithFiles = assets.map(asset => ({
-        ...asset,
-        metadata: asset.metadata ? JSON.parse(asset.metadata) : null,
-        files: asset.files ? JSON.parse(`[${asset.files}]`) : []
-      }));
-
-      res.json({ assets: assetsWithFiles });
-    });
-  } catch (error) {
-    console.error('Error getting supervisor assets:', error);
-    res.status(500).json({ error: 'Failed to get assets for review' });
-  }
-};
-
-// Get next asset for supervisor review
-const getNextAssetForReview = async (req, res) => {
-  try {
-    db.get(
-      `SELECT 
-        a.*,
-        u.username as uploader_username,
-        u.email as uploader_email,
-        qc.username as qc_username,
-        qc.email as qc_email,
-        qs.action as qc_action,
-        qs.reject_reason as qc_reject_reason,
-        qs.metadata_before,
-        qs.metadata_after
-      FROM assets a
-      LEFT JOIN users u ON a.user_id = u.id
-      LEFT JOIN users qc ON a.qc_completed_by = qc.id
-      LEFT JOIN qc_submissions qs ON qs.asset_id = a.asset_id AND qs.qc_user_id = a.qc_completed_by
-      WHERE a.send_to_supervisor = 1 
-        AND (a.supervisor_status = 'pending' OR a.supervisor_status IS NULL)
-      ORDER BY a.qc_completed_date ASC
-      LIMIT 1`,
-      [],
-      (err, asset) => {
-        if (err) {
-          console.error('Error fetching next asset for review:', err);
-          return res.status(500).json({ error: 'Failed to fetch next asset' });
-        }
-
-        if (!asset) {
-          return res.json({ asset: null, files: [], hasNext: false });
-        }
-
-        // Get files for this asset
-        db.all(
-          `SELECT * FROM uploads WHERE asset_id = ?`,
-          [asset.asset_id],
-          (err, files) => {
-            if (err) {
-              console.error('Error fetching files:', err);
-              return res.status(500).json({ error: 'Failed to fetch files' });
-            }
-
-            // Check if there are more assets
+            // Get pending QC
             db.get(
-              `SELECT COUNT(*) as count 
-               FROM assets 
-               WHERE send_to_supervisor = 1 
-                 AND (supervisor_status = 'pending' OR supervisor_status IS NULL)
-                 AND id > ?`,
-              [asset.id],
-              (err, countResult) => {
-                if (err) {
-                  console.error('Error checking next assets:', err);
-                }
+              'SELECT COUNT(*) as count FROM assets WHERE assigned_to IS NOT NULL AND qc_status IS NULL',
+              (err, result) => {
+                if (err) return reject(err);
+                stats.pending_qc = result.count;
 
-                res.json({
-                  asset: {
-                    ...asset,
-                    metadata: asset.metadata ? JSON.parse(asset.metadata) : null,
-                    metadata_before: asset.metadata_before ? JSON.parse(asset.metadata_before) : null,
-                    metadata_after: asset.metadata_after ? JSON.parse(asset.metadata_after) : null
-                  },
-                  files,
-                  hasNext: countResult ? countResult.count > 0 : false
-                });
+                // Get completed QC count
+                db.get(
+                  'SELECT COUNT(*) as count FROM assets WHERE qc_status IS NOT NULL',
+                  (err, result) => {
+                    if (err) return reject(err);
+                    stats.completed_qc = result.count;
+
+                    // Get approved count
+                    db.get(
+                      'SELECT COUNT(*) as count FROM assets WHERE qc_status = ?',
+                      ['approved'],
+                      (err, result) => {
+                        if (err) return reject(err);
+                        stats.approved = result.count;
+
+                        // Get rejected count
+                        db.get(
+                          'SELECT COUNT(*) as count FROM assets WHERE qc_status = ?',
+                          ['rejected'],
+                          (err, result) => {
+                            if (err) return reject(err);
+                            stats.rejected = result.count;
+
+                            // Get supervisor review requested count
+                            db.get(
+                              'SELECT COUNT(*) as count FROM assets WHERE supervisor_review_requested = 1',
+                              (err, result) => {
+                                if (err) return reject(err);
+                                stats.review_requested = result.count;
+                                resolve(stats);
+                              }
+                            );
+                          }
+                        );
+                      }
+                    );
+                  }
+                );
               }
             );
           }
         );
-      }
-    );
+      });
+    });
+
+    res.json({ statistics });
   } catch (error) {
-    console.error('Error getting next asset for review:', error);
-    res.status(500).json({ error: 'Failed to get next asset for review' });
+    console.error('Error fetching supervisor statistics:', error);
+    res.status(500).json({ error: 'Failed to fetch statistics' });
   }
 };
 
-// Submit supervisor review
-const submitSupervisorReview = async (req, res) => {
+// Get assets with filtering and pagination for supervisor review
+const getAssets = async (req, res) => {
   try {
-    const supervisorId = req.user.id;
-    const { assetId } = req.params;
-    const { 
-      action, // 'approved', 'rejected', or 'consulted'
-      notes,
-      updatedMetadata
-    } = req.body;
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      qc_status,
+      qc_user,
+      deliverable_type,
+      supervisor_review_requested
+    } = req.query;
 
-    // Validate action
-    if (!['approved', 'rejected', 'consulted'].includes(action)) {
-      return res.status(400).json({ error: 'Invalid action' });
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    let whereConditions = [];
+    let params = [];
+
+    // Build WHERE conditions
+    if (search) {
+      whereConditions.push('a.asset_id LIKE ?');
+      params.push(`%${search}%`);
     }
 
-    db.serialize(() => {
-      // Create supervisor review record
-      db.run(
-        `INSERT INTO supervisor_reviews 
-         (asset_id, supervisor_id, action, notes, reviewed_at)
-         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-        [assetId, supervisorId, action, notes || null],
-        function(err) {
-          if (err) {
-            console.error('Error creating supervisor review:', err);
-            return res.status(500).json({ error: 'Failed to create supervisor review' });
-          }
+    if (qc_status && qc_status !== 'all') {
+      if (qc_status === 'pending') {
+        whereConditions.push('a.qc_status IS NULL');
+      } else {
+        whereConditions.push('a.qc_status = ?');
+        params.push(qc_status);
+      }
+    }
 
-          // Update asset
-          let updateQuery = `
-            UPDATE assets 
-            SET supervisor_status = ?,
-                supervisor_reviewed_by = ?,
-                supervisor_reviewed_date = CURRENT_TIMESTAMP,
-                supervisor_notes = ?
-          `;
+    if (qc_user) {
+      whereConditions.push('a.assigned_to = ?');
+      params.push(qc_user);
+    }
 
-          const updateParams = [action, supervisorId, notes || null];
+    if (deliverable_type) {
+      whereConditions.push('a.deliverable_type = ?');
+      params.push(deliverable_type);
+    }
 
-          // If metadata was updated, include it
-          if (updatedMetadata) {
-            updateQuery += ', metadata = ?';
-            updateParams.push(JSON.stringify(updatedMetadata));
-          }
+    if (supervisor_review_requested === 'true') {
+      whereConditions.push('a.supervisor_review_requested = 1');
+    }
 
-          updateQuery += ' WHERE asset_id = ?';
-          updateParams.push(assetId);
+    const whereClause = whereConditions.length > 0 ? 
+      `WHERE ${whereConditions.join(' AND ')}` : '';
 
-          db.run(updateQuery, updateParams, function(err) {
-            if (err) {
-              console.error('Error updating asset:', err);
-              return res.status(500).json({ error: 'Failed to update asset' });
-            }
+    // Get total count
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM assets a
+      LEFT JOIN users uploader ON a.user_id = uploader.id
+      LEFT JOIN users qc_user ON a.assigned_to = qc_user.id
+      ${whereClause}
+    `;
 
-            res.json({ 
-              success: true,
-              reviewId: this.lastID,
-              message: `Asset ${action} by supervisor`
-            });
-          });
-        }
-      );
+    const totalCount = await new Promise((resolve, reject) => {
+      db.get(countQuery, params, (err, result) => {
+        if (err) reject(err);
+        else resolve(result.total);
+      });
     });
+
+    // Get assets with pagination
+    const assetsQuery = `
+      SELECT 
+        a.id,
+        a.asset_id,
+        a.user_id,
+        a.deliverable_type,
+        a.metadata,
+        a.created_date,
+        a.batch_id,
+        a.assigned_to,
+        a.qc_status,
+        a.qc_completed_date,
+        a.qc_notes as qc_comments,
+        a.supervisor_review_requested,
+        uploader.username,
+        uploader.email as uploader_email,
+        qc_user.username as qc_username,
+        qc_user.email as qc_email,
+        uploader.username as uploader_name
+      FROM assets a
+      LEFT JOIN users uploader ON a.user_id = uploader.id
+      LEFT JOIN users qc_user ON a.assigned_to = qc_user.id
+      ${whereClause}
+      ORDER BY a.created_date DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const finalParams = [...params, parseInt(limit), offset];
+
+    const assets = await new Promise((resolve, reject) => {
+      db.all(assetsQuery, finalParams, (err, results) => {
+        if (err) reject(err);
+        else resolve(results);
+      });
+    });
+
+    const totalPages = Math.ceil(totalCount / parseInt(limit));
+
+    res.json({
+      assets,
+      totalCount,
+      totalPages,
+      currentPage: parseInt(page)
+    });
+
   } catch (error) {
-    console.error('Error submitting supervisor review:', error);
-    res.status(500).json({ error: 'Failed to submit supervisor review' });
+    console.error('Error fetching assets:', error);
+    res.status(500).json({ error: 'Failed to fetch assets' });
   }
 };
 
-// Get supervisor statistics
-const getSupervisorStats = async (req, res) => {
+// Get filter options for dropdowns
+const getFilterOptions = async (req, res) => {
   try {
-    const query = `
-      SELECT 
-        COUNT(CASE WHEN send_to_supervisor = 1 THEN 1 END) as total_for_review,
-        COUNT(CASE WHEN send_to_supervisor = 1 AND (supervisor_status = 'pending' OR supervisor_status IS NULL) THEN 1 END) as pending_review,
-        COUNT(CASE WHEN supervisor_status = 'approved' THEN 1 END) as approved,
-        COUNT(CASE WHEN supervisor_status = 'rejected' THEN 1 END) as rejected,
-        COUNT(CASE WHEN supervisor_status = 'consulted' THEN 1 END) as consulted
-      FROM assets
-    `;
+    const [qcUsers, deliverableTypes] = await Promise.all([
+      // Get QC users
+      new Promise((resolve, reject) => {
+        db.all(
+          'SELECT id, username FROM users WHERE role = ? AND is_active = 1',
+          ['qc_user'],
+          (err, results) => {
+            if (err) reject(err);
+            else resolve(results);
+          }
+        );
+      }),
+      
+      // Get deliverable types
+      new Promise((resolve, reject) => {
+        db.all(
+          'SELECT DISTINCT deliverable_type FROM assets WHERE deliverable_type IS NOT NULL ORDER BY deliverable_type',
+          (err, results) => {
+            if (err) reject(err);
+            else resolve(results.map(r => r.deliverable_type));
+          }
+        );
+      })
+    ]);
 
-    db.get(query, [], (err, stats) => {
-      if (err) {
-        console.error('Error fetching supervisor stats:', err);
-        return res.status(500).json({ error: 'Failed to fetch supervisor statistics' });
-      }
+    res.json({
+      qcUsers,
+      deliverableTypes
+    });
 
-      // Also get recent reviews by this supervisor
-      const supervisorId = req.user.id;
+  } catch (error) {
+    console.error('Error fetching filter options:', error);
+    res.status(500).json({ error: 'Failed to fetch filter options' });
+  }
+};
+
+// Get specific asset details for review
+const getAssetDetails = async (req, res) => {
+  try {
+    const { assetId } = req.params;
+
+    const asset = await new Promise((resolve, reject) => {
       db.get(
         `SELECT 
-          COUNT(*) as my_reviews,
-          COUNT(CASE WHEN action = 'approved' THEN 1 END) as my_approved,
-          COUNT(CASE WHEN action = 'rejected' THEN 1 END) as my_rejected,
-          COUNT(CASE WHEN action = 'consulted' THEN 1 END) as my_consulted
-        FROM supervisor_reviews
-        WHERE supervisor_id = ?`,
-        [supervisorId],
-        (err, myStats) => {
-          if (err) {
-            console.error('Error fetching my supervisor stats:', err);
-            return res.status(200).json({ stats });
-          }
-
-          res.json({ 
-            stats: {
-              ...stats,
-              myReviews: myStats
-            }
-          });
+          a.*,
+          uploader.username as uploader_name,
+          uploader.email as uploader_email,
+          qc_user.username as qc_username,
+          qc_user.email as qc_email
+        FROM assets a
+        LEFT JOIN users uploader ON a.user_id = uploader.id
+        LEFT JOIN users qc_user ON a.assigned_to = qc_user.id
+        WHERE a.asset_id = ?`,
+        [assetId],
+        (err, result) => {
+          if (err) reject(err);
+          else resolve(result);
         }
       );
     });
-  } catch (error) {
-    console.error('Error getting supervisor stats:', error);
-    res.status(500).json({ error: 'Failed to get supervisor statistics' });
-  }
-};
 
-// Get QC users' performance
-const getQCPerformance = async (req, res) => {
-  try {
-    const query = `
-      SELECT 
-        u.id,
-        u.username,
-        u.email,
-        COUNT(DISTINCT a.id) as total_reviewed,
-        COUNT(CASE WHEN a.qc_status = 'completed' THEN 1 END) as approved,
-        COUNT(CASE WHEN a.qc_status = 'rejected' THEN 1 END) as rejected,
-        COUNT(CASE WHEN a.send_to_supervisor = 1 THEN 1 END) as sent_to_supervisor,
-        COUNT(CASE WHEN a.supervisor_status = 'approved' THEN 1 END) as supervisor_approved,
-        COUNT(CASE WHEN a.supervisor_status = 'rejected' THEN 1 END) as supervisor_rejected
-      FROM users u
-      LEFT JOIN assets a ON a.qc_completed_by = u.id
-      WHERE u.role = 'qc_user'
-      GROUP BY u.id
-      ORDER BY total_reviewed DESC
-    `;
+    if (!asset) {
+      return res.status(404).json({ error: 'Asset not found' });
+    }
 
-    db.all(query, [], (err, performance) => {
-      if (err) {
-        console.error('Error fetching QC performance:', err);
-        return res.status(500).json({ error: 'Failed to fetch QC performance' });
-      }
-
-      res.json({ performance });
+    // Get associated files
+    const files = await new Promise((resolve, reject) => {
+      db.all(
+        'SELECT * FROM uploads WHERE asset_id = ? ORDER BY upload_date',
+        [assetId],
+        (err, results) => {
+          if (err) reject(err);
+          else resolve(results);
+        }
+      );
     });
+
+    res.json({
+      asset: {
+        ...asset,
+        metadata: asset.metadata ? JSON.parse(asset.metadata) : {}
+      },
+      files
+    });
+
   } catch (error) {
-    console.error('Error getting QC performance:', error);
-    res.status(500).json({ error: 'Failed to get QC performance' });
+    console.error('Error fetching asset details:', error);
+    res.status(500).json({ error: 'Failed to fetch asset details' });
   }
 };
+
+// Update asset QC status (supervisor review)
+const updateAssetStatus = async (req, res) => {
+  try {
+    const { assetId } = req.params;
+    const { status, supervisor_notes, updated_metadata } = req.body;
+    const supervisorId = req.user.id;
+
+    // Validate status (only approved or rejected)
+    const validStatuses = ['approved', 'rejected'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Must be approved or rejected.' });
+    }
+
+    // Update asset with metadata
+    await new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE assets 
+         SET qc_status = ?, 
+             qc_completed_date = CURRENT_TIMESTAMP,
+             supervisor_reviewed_by = ?,
+             supervisor_notes = ?,
+             metadata = ?
+         WHERE asset_id = ?`,
+        [status, supervisorId, supervisor_notes, updated_metadata ? JSON.stringify(updated_metadata) : null, assetId],
+        function(err) {
+          if (err) reject(err);
+          else if (this.changes === 0) reject(new Error('Asset not found'));
+          else resolve();
+        }
+      );
+    });
+
+    // Log supervisor action
+    db.run(
+      `INSERT INTO supervisor_actions 
+       (supervisor_id, action_type, target_upload_id, description, action_data, performed_at)
+       VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+      [
+        supervisorId,
+        'asset_review',
+        null, // We don't have upload_id directly linked
+        `Reviewed asset ${assetId} - ${status}`,
+        JSON.stringify({ status, supervisor_notes, updated_metadata })
+      ]
+    );
+
+    res.json({ 
+      message: 'Asset status updated successfully',
+      status,
+      assetId 
+    });
+
+  } catch (error) {
+    console.error('Error updating asset status:', error);
+    res.status(500).json({ error: 'Failed to update asset status' });
+  }
+};
+
 
 module.exports = {
-  getAssetsForReview,
-  getNextAssetForReview,
-  submitSupervisorReview,
-  getSupervisorStats,
-  getQCPerformance
+  getStatistics,
+  getAssets,
+  getFilterOptions,
+  getAssetDetails,
+  updateAssetStatus
 };

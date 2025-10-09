@@ -268,7 +268,7 @@ const submitQCReview = async (req, res) => {
               }
 
               // Update asset
-              const qcStatus = action === 'approved' ? 'completed' : 'rejected';
+              const qcStatus = action === 'approved' ? 'approved' : 'rejected';
               const supervisorStatus = sendToSupervisor ? 'pending' : null;
 
               db.run(
@@ -373,7 +373,7 @@ const getQCStats = async (req, res) => {
         COUNT(*) as total_assigned,
         COUNT(CASE WHEN qc_status = 'pending' OR qc_status IS NULL THEN 1 END) as pending,
         COUNT(CASE WHEN qc_status = 'in_progress' THEN 1 END) as in_progress,
-        COUNT(CASE WHEN qc_status = 'completed' THEN 1 END) as completed,
+        COUNT(CASE WHEN qc_status = 'approved' THEN 1 END) as completed,
         COUNT(CASE WHEN qc_status = 'rejected' THEN 1 END) as rejected,
         COUNT(CASE WHEN send_to_supervisor = 1 THEN 1 END) as sent_to_supervisor
       FROM assets

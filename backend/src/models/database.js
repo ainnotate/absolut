@@ -104,7 +104,16 @@ const initializeDatabase = () => {
           deliverable_type TEXT NOT NULL,
           metadata TEXT,
           created_date DATETIME DEFAULT CURRENT_TIMESTAMP,
-          FOREIGN KEY (user_id) REFERENCES users(id)
+          batch_id TEXT,
+          assigned_to INTEGER,
+          qc_status TEXT CHECK(qc_status IN ('approved', 'rejected', 'needs_revision')),
+          qc_completed_date DATETIME,
+          qc_comments TEXT,
+          supervisor_id INTEGER,
+          supervisor_notes TEXT,
+          FOREIGN KEY (user_id) REFERENCES users(id),
+          FOREIGN KEY (assigned_to) REFERENCES users(id),
+          FOREIGN KEY (supervisor_id) REFERENCES users(id)
         )
       `, (err) => {
         if (err) {
