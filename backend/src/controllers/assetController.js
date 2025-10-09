@@ -11,12 +11,23 @@ const getAssets = async (req, res) => {
         a.deliverable_type,
         a.metadata,
         a.created_date,
+        a.batch_id,
+        a.assigned_to,
+        a.qc_status,
+        a.qc_completed_by,
+        a.qc_completed_date,
+        a.qc_notes,
         u.username,
         u.email,
         u.first_name,
-        u.last_name
+        u.last_name,
+        qc_user.username as qc_username,
+        qc_user.email as qc_email,
+        qc_user.first_name as qc_first_name,
+        qc_user.last_name as qc_last_name
       FROM assets a
       JOIN users u ON a.user_id = u.id
+      LEFT JOIN users qc_user ON a.assigned_to = qc_user.id
       ORDER BY a.created_date DESC
     `, [], (err, assets) => {
       if (err) {
@@ -63,12 +74,24 @@ const getAssets = async (req, res) => {
             deliverableType: asset.deliverable_type,
             metadata: asset.metadata ? JSON.parse(asset.metadata) : null,
             createdDate: asset.created_date,
+            batch_id: asset.batch_id,
+            assigned_to: asset.assigned_to,
+            qc_status: asset.qc_status,
+            qc_completed_by: asset.qc_completed_by,
+            qc_completed_date: asset.qc_completed_date,
+            qc_notes: asset.qc_notes,
             user: {
               username: asset.username,
               email: asset.email,
               first_name: asset.first_name,
               last_name: asset.last_name
             },
+            qc_user: asset.qc_username ? {
+              username: asset.qc_username,
+              email: asset.qc_email,
+              first_name: asset.qc_first_name,
+              last_name: asset.qc_last_name
+            } : null,
             files: files.map(file => ({
               id: file.id,
               filename: file.filename,
