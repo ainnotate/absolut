@@ -263,8 +263,234 @@ const getExportFilterOptions = async (req, res) => {
   }
 };
 
+// Get progress tracking statistics
+const getProgressStats = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    let dateFilter = '';
+    const params = [];
+    
+    if (startDate && endDate) {
+      dateFilter = 'AND DATE(a.created_date) BETWEEN ? AND ?';
+      params.push(startDate, endDate);
+    }
+
+    // Get overall statistics
+    const statsQuery = `
+      SELECT 
+        COUNT(*) as total_assets,
+        COUNT(CASE WHEN a.qc_status = 'approved' THEN 1 END) as completed,
+        ROUND(AVG(daily_completed.completed_per_day), 0) as average_per_day
+      FROM assets a
+      LEFT JOIN (
+        SELECT 
+          DATE(created_date) as date,
+          COUNT(*) as completed_per_day
+        FROM assets
+        WHERE qc_status = 'approved'
+        GROUP BY DATE(created_date)
+      ) daily_completed ON 1=1
+      WHERE 1=1 ${dateFilter}
+    `;
+
+    db.get(statsQuery, params, (err, stats) => {
+      if (err) {
+        console.error('Error fetching progress stats:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to fetch progress statistics'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          totalAssets: stats.total_assets || 0,
+          completed: stats.completed || 0,
+          averagePerDay: stats.average_per_day || 0
+        }
+      });
+    });
+
+  } catch (error) {
+    console.error('Error in getProgressStats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+// Get locale-wise progress data
+const getLocaleProgress = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    let dateFilter = '';
+    const params = [];
+    
+    if (startDate && endDate) {
+      dateFilter = 'AND DATE(a.created_date) BETWEEN ? AND ?';
+      params.push(startDate, endDate);
+    }
+
+    const query = `
+      SELECT 
+        JSON_EXTRACT(metadata, '$.locale') as locale,
+        COUNT(*) as total,
+        COUNT(CASE WHEN qc_status = 'approved' THEN 1 END) as completed,
+        COUNT(CASE WHEN qc_status != 'approved' OR qc_status IS NULL THEN 1 END) as remaining
+      FROM assets a
+      WHERE JSON_EXTRACT(metadata, '$.locale') IS NOT NULL 
+      AND JSON_EXTRACT(metadata, '$.locale') != ''
+      ${dateFilter}
+      GROUP BY JSON_EXTRACT(metadata, '$.locale')
+      ORDER BY locale
+    `;
+
+    db.all(query, params, (err, results) => {
+      if (err) {
+        console.error('Error fetching locale progress:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to fetch locale progress'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: results.map(row => ({
+          locale: row.locale,
+          total: row.total,
+          completed: row.completed,
+          remaining: row.remaining
+        }))
+      });
+    });
+
+  } catch (error) {
+    console.error('Error in getLocaleProgress:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+// Get date-wise completion data
+const getDateProgress = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    let dateFilter = '';
+    const params = [];
+    
+    if (startDate && endDate) {
+      dateFilter = 'WHERE DATE(qc_completed_date) BETWEEN ? AND ?';
+      params.push(startDate, endDate);
+    } else {
+      // Default to last 30 days
+      dateFilter = 'WHERE DATE(qc_completed_date) >= DATE("now", "-30 days")';
+    }
+
+    const query = `
+      SELECT 
+        DATE(qc_completed_date) as date,
+        COUNT(*) as completed
+      FROM assets
+      ${dateFilter}
+      AND qc_status = 'approved'
+      AND qc_completed_date IS NOT NULL
+      GROUP BY DATE(qc_completed_date)
+      ORDER BY date DESC
+      LIMIT 30
+    `;
+
+    db.all(query, params, (err, results) => {
+      if (err) {
+        console.error('Error fetching date progress:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to fetch date progress'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: results.reverse() // Show oldest to newest
+      });
+    });
+
+  } catch (error) {
+    console.error('Error in getDateProgress:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+// Get user performance data
+const getUserPerformance = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    let dateFilter = '';
+    const params = [];
+    
+    if (startDate && endDate) {
+      dateFilter = 'AND DATE(a.qc_completed_date) BETWEEN ? AND ?';
+      params.push(startDate, endDate);
+    }
+
+    const query = `
+      SELECT 
+        u.username,
+        COUNT(CASE WHEN a.qc_status = 'approved' THEN 1 END) as completed,
+        COUNT(CASE WHEN a.qc_status = 'pending' OR a.qc_status = 'in_review' THEN 1 END) as in_progress,
+        COUNT(CASE WHEN a.qc_status IS NULL OR a.qc_status = 'rejected' THEN 1 END) as pending
+      FROM users u
+      LEFT JOIN assets a ON u.id = a.qc_completed_by
+      WHERE u.role IN ('qc_user', 'supervisor', 'admin')
+      AND u.username NOT IN ('admin', 'supervisor1')
+      ${dateFilter}
+      GROUP BY u.id, u.username
+      HAVING (completed + in_progress + pending) > 0
+      ORDER BY completed DESC
+      LIMIT 20
+    `;
+
+    db.all(query, params, (err, results) => {
+      if (err) {
+        console.error('Error fetching user performance:', err);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to fetch user performance'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: results
+      });
+    });
+
+  } catch (error) {
+    console.error('Error in getUserPerformance:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
 module.exports = {
   exportQCResults,
   getExportStats,
-  getExportFilterOptions
+  getExportFilterOptions,
+  getProgressStats,
+  getLocaleProgress,
+  getDateProgress,
+  getUserPerformance
 };

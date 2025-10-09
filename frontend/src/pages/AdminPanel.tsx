@@ -38,6 +38,7 @@ import UserManagement from '../components/UserManagement';
 import AssetTracking from '../components/AssetTracking';
 import BatchAssignment from '../components/BatchAssignment';
 import DataExport from '../components/DataExport';
+import ProgressTracking from '../components/ProgressTracking';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -672,14 +673,7 @@ const AdminPanel: React.FC = () => {
         </TabPanel>
 
         <TabPanel value={tabValue} index={3}>
-          <Box sx={{ p: 3 }}>
-            <Typography variant="h5" gutterBottom>
-              Progress
-            </Typography>
-            <Typography color="textSecondary" paragraph>
-              View detailed progress reports and analytics. This feature will be implemented soon.
-            </Typography>
-          </Box>
+          <ProgressTracking />
         </TabPanel>
 
         <TabPanel value={tabValue} index={4}>
