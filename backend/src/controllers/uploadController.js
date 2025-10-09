@@ -160,24 +160,6 @@ const uploadFiles = async (req, res) => {
     // Generate unique Asset ID
     const assetId = `AST_${req.user.id}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
-    // Create asset record first
-    await new Promise((resolve, reject) => {
-      db.run(
-        `INSERT INTO assets (asset_id, user_id, deliverable_type, metadata) 
-         VALUES (?, ?, ?, ?)`,
-        [
-          assetId,
-          req.user.id,
-          deliverableType,
-          JSON.stringify(metadataObj)
-        ],
-        (err) => {
-          if (err) reject(err);
-          else resolve();
-        }
-      );
-    });
-
     // Process files based on category
     if (category === '.eml') {
       const emlFile = files.emlFile?.[0];
@@ -322,27 +304,71 @@ const uploadFiles = async (req, res) => {
       });
     }
 
-    // Save upload records to database
-    for (const fileInfo of uploadedFiles) {
-      await new Promise((resolve, reject) => {
+    // All files uploaded successfully to S3, now create database records in transaction
+    await new Promise((resolve, reject) => {
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        
+        // Create asset record
         db.run(
-          `INSERT INTO uploads (asset_id, user_id, filename, file_type, s3_key, md5_hash) 
-           VALUES (?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO assets (asset_id, user_id, deliverable_type, metadata) 
+           VALUES (?, ?, ?, ?)`,
           [
-            fileInfo.assetId,
+            assetId,
             req.user.id,
-            fileInfo.filename,
-            fileInfo.type,
-            fileInfo.s3Key,
-            fileInfo.md5Hash
+            deliverableType,
+            JSON.stringify(metadataObj)
           ],
-          (err) => {
-            if (err) reject(err);
-            else resolve();
+          function(err) {
+            if (err) {
+              console.error('Error creating asset:', err);
+              db.run('ROLLBACK');
+              return reject(err);
+            }
+
+            // Insert upload records
+            let pendingInserts = uploadedFiles.length;
+            let hasError = false;
+
+            if (pendingInserts === 0) {
+              db.run('COMMIT');
+              return resolve();
+            }
+
+            uploadedFiles.forEach((fileInfo) => {
+              db.run(
+                `INSERT INTO uploads (asset_id, user_id, filename, file_type, category, s3_key, md5_hash, metadata) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  fileInfo.assetId,
+                  req.user.id,
+                  fileInfo.filename,
+                  fileInfo.type,
+                  category,
+                  fileInfo.s3Key,
+                  fileInfo.md5Hash,
+                  JSON.stringify(metadataObj)
+                ],
+                function(err) {
+                  if (err && !hasError) {
+                    hasError = true;
+                    console.error('Error creating upload record:', err);
+                    db.run('ROLLBACK');
+                    return reject(err);
+                  }
+
+                  pendingInserts--;
+                  if (pendingInserts === 0 && !hasError) {
+                    db.run('COMMIT');
+                    resolve();
+                  }
+                }
+              );
+            });
           }
         );
       });
-    }
+    });
 
     res.status(201).json({
       message: 'Files uploaded successfully',
