@@ -27,7 +27,8 @@ import {
   CheckCircle,
   Pending,
   Error,
-  Assessment
+  Assessment,
+  Refresh
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
@@ -63,11 +64,21 @@ const QCDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchQCData();
+    
+    // Set up automatic refresh every 30 seconds to capture reassignment changes
+    const refreshInterval = setInterval(() => {
+      fetchQCData(false); // Don't show loading spinner for automatic refreshes
+    }, 30000);
+    
+    // Clean up interval on component unmount
+    return () => clearInterval(refreshInterval);
   }, []);
 
-  const fetchQCData = async () => {
+  const fetchQCData = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       const token = localStorage.getItem('token');
 
       // Fetch QC statistics
@@ -141,6 +152,14 @@ const QCDashboard: React.FC = () => {
           <Typography variant="body2" sx={{ mr: 2 }}>
             {currentUser?.first_name || currentUser?.username} (QC)
           </Typography>
+          <Button 
+            color="inherit" 
+            onClick={() => fetchQCData(false)} 
+            startIcon={<Refresh />}
+            sx={{ mr: 1 }}
+          >
+            Refresh
+          </Button>
           <Button color="inherit" onClick={handleLogout} startIcon={<Logout />}>
             Logout
           </Button>
