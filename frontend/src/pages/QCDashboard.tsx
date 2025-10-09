@@ -136,7 +136,7 @@ const QCDashboard: React.FC = () => {
         <Toolbar>
           <Assessment sx={{ mr: 2 }} />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            QC Dashboard - Absolute Platform
+            QC Dashboard - Absolute Booking Data Collection Platform
           </Typography>
           <Typography variant="body2" sx={{ mr: 2 }}>
             {currentUser?.first_name || currentUser?.username} (QC)

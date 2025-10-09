@@ -88,7 +88,7 @@ const Login: React.FC = () => {
 
     try {
       await authService.register(registerForm);
-      setSuccess('Registration successful! Welcome to Absolute Platform!');
+      setSuccess('Registration successful! Welcome to Absolute Booking Data Collection Platform!');
       setTimeout(() => {
         window.location.href = '/dashboard';
       }, 1000);
@@ -219,8 +219,8 @@ const Login: React.FC = () => {
           alignItems: 'center',
         }}
       >
-        <Typography component="h1" variant="h3" gutterBottom>
-          Absolute Platform
+        <Typography component="h1" variant="h3" gutterBottom align="center">
+          Absolute Booking Data Collection Platform
         </Typography>
         
         <Card sx={{ width: '100%', mt: 3 }}>

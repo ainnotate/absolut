@@ -82,7 +82,7 @@ const AdminPanel: React.FC = () => {
         </Typography>
         <Typography variant="body1" color="text.secondary" paragraph>
           Welcome back, {currentUser?.first_name || currentUser?.username}! 
-          Here you can manage all aspects of the Absolute Platform.
+          Here you can manage all aspects of the Absolute Booking Data Collection Platform.
         </Typography>
       </Grid>
 
@@ -189,7 +189,7 @@ const AdminPanel: React.FC = () => {
         <Toolbar>
           <DashboardIcon sx={{ mr: 2 }} />
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Admin Dashboard - Absolute Platform
+            Admin Dashboard - Absolute Booking Data Collection Platform
           </Typography>
           <Typography variant="body2" sx={{ mr: 2 }}>
             {currentUser?.first_name || currentUser?.username} (Admin)

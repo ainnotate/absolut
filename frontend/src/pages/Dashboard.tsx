@@ -351,7 +351,7 @@ const Dashboard: React.FC = () => {
       default:
         return (
           <Typography variant="body1">
-            Welcome to the Absolute Platform! Your role configuration is being set up.
+            Welcome to the Absolute Booking Data Collection Platform! Your role configuration is being set up.
           </Typography>
         );
     }
@@ -362,7 +362,7 @@ const Dashboard: React.FC = () => {
       <AppBar position="static">
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Absolute Platform
+            Absolute Booking Data Collection Platform
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Avatar src={user.profile_picture} sx={{ width: 32, height: 32 }}>

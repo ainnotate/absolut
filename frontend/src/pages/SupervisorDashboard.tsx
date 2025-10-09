@@ -336,7 +336,7 @@ const SupervisorDashboard: React.FC = () => {
           <Toolbar>
             <Dashboard sx={{ mr: 2 }} />
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              Supervisor Dashboard - Absolute Platform
+              Supervisor Dashboard - Absolute Booking Data Collection Platform
             </Typography>
             <Typography variant="body2" sx={{ mr: 2 }}>
               {currentUser?.username} (Supervisor)

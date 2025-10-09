@@ -440,7 +440,7 @@ const UploaderDashboard: React.FC = () => {
       <AppBar position="static">
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Absolute Platform - Upload Dashboard
+            Absolute Booking Data Collection Platform - Upload Dashboard
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {user && (
