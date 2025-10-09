@@ -44,13 +44,22 @@ const getStatistics = async (req, res) => {
                             if (err) return reject(err);
                             stats.rejected = result.count;
 
-                            // Get supervisor review requested count
+                            // Get supervisor review requested count (total flagged for review)
                             db.get(
                               'SELECT COUNT(*) as count FROM assets WHERE supervisor_review_requested = 1',
                               (err, result) => {
                                 if (err) return reject(err);
                                 stats.review_requested = result.count;
-                                resolve(stats);
+                                
+                                // Get pending supervisor review count (flagged but not reviewed yet)
+                                db.get(
+                                  'SELECT COUNT(*) as count FROM assets WHERE supervisor_review_requested = 1 AND supervisor_reviewed_by IS NULL',
+                                  (err, result) => {
+                                    if (err) return reject(err);
+                                    stats.pending_supervisor_review = result.count;
+                                    resolve(stats);
+                                  }
+                                );
                               }
                             );
                           }

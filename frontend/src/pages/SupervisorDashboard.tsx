@@ -79,6 +79,7 @@ interface Statistics {
   approved: number;
   rejected: number;
   review_requested: number;
+  pending_supervisor_review: number;
 }
 
 const SupervisorDashboard: React.FC = () => {
@@ -365,10 +366,10 @@ const SupervisorDashboard: React.FC = () => {
               <Card>
                 <CardContent>
                   <Typography color="textSecondary" gutterBottom>
-                    Pending QC
+                    Pending Review
                   </Typography>
                   <Typography variant="h4" color="warning.main">
-                    {statistics.pending_qc}
+                    {(statistics.total_assets - statistics.approved - statistics.rejected) || 0}
                   </Typography>
                 </CardContent>
               </Card>
@@ -401,10 +402,10 @@ const SupervisorDashboard: React.FC = () => {
               <Card>
                 <CardContent>
                   <Typography color="textSecondary" gutterBottom>
-                    Rejected
+                    Consulted
                   </Typography>
-                  <Typography variant="h4" color="error.main">
-                    {statistics.rejected}
+                  <Typography variant="h4" color="info.main">
+                    {statistics.pending_supervisor_review || 0}
                   </Typography>
                 </CardContent>
               </Card>
