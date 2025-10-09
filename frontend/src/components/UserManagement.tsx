@@ -215,54 +215,6 @@ const UserManagement: React.FC = () => {
 
   return (
     <Box>
-      {/* Statistics Cards */}
-      {stats && (
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} sm={6} md={4}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Total Users
-                </Typography>
-                <Typography variant="h4">
-                  {stats.totalStats.total_users}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Active Users
-                </Typography>
-                <Typography variant="h4">
-                  {stats.totalStats.active_users}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <Card 
-              sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'action.hover' } }}
-              onClick={() => setRolesDialogOpen(true)}
-            >
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  User Roles
-                </Typography>
-                <Typography variant="h4">
-                  {stats.roleStats.length}
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  Click to view details
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      )}
-
       {/* Actions */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
         <Typography variant="h5">
