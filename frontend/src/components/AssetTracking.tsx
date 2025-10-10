@@ -264,7 +264,7 @@ const AssetTracking: React.FC = () => {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://192.168.29.158:5003/api/assets', {
+      const response = await fetch('http://localhost:5003/api/assets', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

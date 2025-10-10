@@ -72,7 +72,7 @@ interface AssetFile {
   s3_key: string;
 }
 
-const API_BASE = 'http://192.168.29.158:5003';
+const API_BASE = 'http://localhost:5003';
 
 // Define category and subcategory mappings
 const categorySubcategories: Record<string, string[]> = {

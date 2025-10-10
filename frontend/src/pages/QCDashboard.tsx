@@ -53,7 +53,7 @@ interface UserBatch {
   completed_count: number;
 }
 
-const API_BASE = 'http://192.168.29.158:5003';
+const API_BASE = 'http://localhost:5003';
 
 const QCDashboard: React.FC = () => {
   const navigate = useNavigate();

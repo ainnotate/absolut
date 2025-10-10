@@ -38,7 +38,7 @@ import { useDropzone } from 'react-dropzone';
 import { authService } from '../services/authService';
 import { User } from '../types';
 
-const API_BASE = 'http://192.168.29.158:5003';
+const API_BASE = 'http://localhost:5003';
 
 type CategoryType = '.eml' | '.eml + pdf' | '.txt';
 

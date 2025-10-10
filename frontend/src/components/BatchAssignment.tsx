@@ -56,7 +56,7 @@ interface UnassignedUser {
   email: string;
 }
 
-const API_BASE = 'http://192.168.29.158:5003';
+const API_BASE = 'http://localhost:5003';
 
 interface BookingCategoryCardProps {
   category: BookingCategoryStats;
