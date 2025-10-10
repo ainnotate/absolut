@@ -81,3 +81,12 @@ temp/
 
 # Unrelated project files
 RE_*
+
+# Translation service large files
+backend/translation_service/models_cache/
+backend/translation_service/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.safetensors
+*.spm
